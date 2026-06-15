@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đăng nhập - AI SQL</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/4712/4712010.png" type="image/png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gradient-custom flex flex-col min-h-screen items-center justify-center relative">
+
+    <a href="index.html" class="absolute top-6 left-6 text-slate-600 hover:text-blue-600 font-bold flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+        Trang chủ
+    </a>
+
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 relative z-10">
+        <h2 id="auth-title" class="text-3xl font-bold text-center text-slate-800 mb-8 gradient-text">Đăng nhập</h2>
+        
+        <form id="auth-form" class="space-y-5">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                <input type="email" id="email" required placeholder="email@example.com" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Mật khẩu</label>
+                <input type="password" id="password" required placeholder="••••••••" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 transition outline-none">
+            </div>
+            
+            <p id="error-message" class="text-red-500 text-sm hidden text-center"></p>
+
+            <button type="submit" id="auth-submit-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow-lg mt-4">
+                <span id="btn-text">Đăng nhập</span>
+            </button>
+        </form>
+
+        <p id="auth-toggle-text" class="text-center text-sm text-slate-500 mt-6">
+            Chưa có tài khoản? <span class="text-blue-600 font-bold cursor-pointer hover:underline" onclick="toggleMode()">Đăng ký ngay</span>
+        </p>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+
+        // Cấu hình Firebase bạn vừa cung cấp
+        const firebaseConfig = {
+            apiKey: "AIzaSyBWvxVVnoOEoK7DlkvH4GMy2TZ5UyItn5A",
+            authDomain: "chatbotairooms.firebaseapp.com",
+            projectId: "chatbotairooms",
+            storageBucket: "chatbotairooms.firebasestorage.app",
+            messagingSenderId: "234528451358",
+            appId: "1:234528451358:web:25c0057f6d6b6545a4770f"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        // Giao diện chuyển đổi Đăng nhập / Đăng ký
+        let isLogin = true;
+        window.toggleMode = () => {
+            isLogin = !isLogin;
+            document.getElementById('auth-title').innerText = isLogin ? 'Đăng nhập' : 'Tạo tài khoản';
+            document.getElementById('btn-text').innerText = isLogin ? 'Đăng nhập' : 'Đăng ký';
+            document.getElementById('auth-toggle-text').innerHTML = isLogin 
+                ? 'Chưa có tài khoản? <span class="text-blue-600 font-bold cursor-pointer hover:underline" onclick="toggleMode()">Đăng ký ngay</span>'
+                : 'Đã có tài khoản? <span class="text-blue-600 font-bold cursor-pointer hover:underline" onclick="toggleMode()">Đăng nhập</span>';
+            document.getElementById('error-message').classList.add('hidden');
+        };
+
+        // Xử lý gửi Form
+        document.getElementById('auth-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const btnText = document.getElementById('btn-text');
+            const errorMsg = document.getElementById('error-message');
+            
+            btnText.innerText = "Đang xử lý...";
+            errorMsg.classList.add('hidden');
+
+            if (isLogin) {
+                // Lệnh Đăng nhập thật của Firebase
+                signInWithEmailAndPassword(auth, email, password)
+                    .then((userCredential) => {
+                        window.location.href = 'chat.html'; // Thành công thì chuyển trang
+                    })
+                    .catch((error) => {
+                        errorMsg.innerText = "Sai email hoặc mật khẩu!";
+                        errorMsg.classList.remove('hidden');
+                        btnText.innerText = "Đăng nhập";
+                    });
+            } else {
+                // Lệnh Đăng ký thật của Firebase
+                createUserWithEmailAndPassword(auth, email, password)
+                    .then((userCredential) => {
+                        alert("Đăng ký thành công! Đang chuyển vào phòng chat...");
+                        window.location.href = 'chat.html';
+                    })
+                    .catch((error) => {
+                        errorMsg.innerText = "Email đã tồn tại hoặc mật khẩu quá ngắn.";
+                        errorMsg.classList.remove('hidden');
+                        btnText.innerText = "Đăng ký";
+                    });
+            }
+        });
+    </script>
+</body>
+</html>
