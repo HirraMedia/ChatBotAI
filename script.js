@@ -1,6 +1,6 @@
 // ==========================================
 // ĐIỀN API KEY BÍ MẬT CỦA BẠN VÀO ĐÂY
-const API_KEY = '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'; 
+const API_KEY = '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'; 
 // ==========================================
 const API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -11,13 +11,13 @@ function toggleAuthMode() {
     const submitBtn = document.getElementById('auth-submit-btn');
     const toggleText = document.getElementById('auth-toggle-text');
 
-    if (nameField.classList.contains('hidden')) {
+    if (nameField && nameField.classList.contains('hidden')) {
         // Chuyển sang Đăng ký
         title.innerText = 'Tạo tài khoản mới';
         nameField.classList.remove('hidden');
         submitBtn.innerText = 'Đăng ký ngay';
         toggleText.innerHTML = 'Đã có tài khoản? <span class="text-blue-600 font-bold cursor-pointer hover:underline" onclick="toggleAuthMode()">Đăng nhập</span>';
-    } else {
+    } else if (nameField) {
         // Chuyển sang Đăng nhập
         title.innerText = 'Đăng nhập hệ thống';
         nameField.classList.add('hidden');
@@ -32,124 +32,6 @@ function handleAuthSubmit(event) {
     window.location.href = 'chat.html'; // Chuyển sang trang chat
 }
 
-// --- LOGIC CHO TRANG CHAT (chat.html) ---
-const chatBox = document.getElementById('chat-box');
-const userInput = document.getElementById('user-input');
-const sendBtn = document.getElementById('send-btn');
-const robotBubble = document.getElementById('robot-bubble');
-
-let chatHistory = [{ role: "system", content: "Bạn là AI giải bài tập SQL. Trả lời ngắn gọn, dùng Markdown format code." }];
-
-// Chỉ chạy logic chat nếu đang ở trang chat.html
-if (chatBox) {
-    window.onload = () => {
-        addMessageToUI('ai', "Chào bạn! Mình là Robot hỗ trợ giải SQL. Hãy gửi cho mình bài tập của bạn nhé.");
-    };
-
-    sendBtn.addEventListener('click', handleSend);
-    userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
-}
-
-async function handleSend() {
-    const text = userInput.value.trim();
-    if (!text) return;
-
-    addMessageToUI('user', text);
-    userInput.value = '';
-    chatHistory.push({ role: "user", content: text });
-    updateRobotBubble("Đang vắt óc suy nghĩ...");
-
-    const typingId = showTypingIndicator();
-
-    try {
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: "llama-3.1-8b-instant",
-                messages: chatHistory,
-                temperature: 0.7
-            })
-        });
-
-        const data = await response.json();
-        removeElement(typingId);
-
-        if (!response.ok) {
-            addMessageToUI('ai', `❌ Lỗi API: Hãy chắc chắn bạn đã điền mã API vào script.js`);
-            updateRobotBubble("Lỗi kết nối rồi!");
-            chatHistory.pop();
-            return;
-        }
-
-        if (data.choices && data.choices.length > 0) {
-            const aiReply = data.choices[0].message.content;
-            addMessageToUI('ai', aiReply);
-            chatHistory.push({ role: "assistant", content: aiReply });
-            
-            // Cập nhật bong bóng robot
-            let shortReply = aiReply.replace(/```[\s\S]*?```/g, "[Đoạn Code]").substring(0, 50) + "...";
-            updateRobotBubble(shortReply);
-        }
-    } catch (error) {
-        removeElement(typingId);
-        addMessageToUI('ai', "❌ Lỗi mạng.");
-        updateRobotBubble("Mất mạng rồi!");
-    }
-}
-
-function updateRobotBubble(text) {
-    robotBubble.innerHTML = text;
-    robotBubble.classList.remove('opacity-0');
-    setTimeout(() => { robotBubble.classList.add('opacity-0'); }, 5000);
-}
-
-function addMessageToUI(sender, text) {
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `flex gap-4 ${sender === 'user' ? 'flex-row-reverse' : ''}`;
-    
-    const avatar = document.createElement('div');
-    avatar.className = `w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 ${sender === 'user' ? 'bg-slate-800' : 'bg-blue-500'}`;
-    avatar.innerText = sender === 'user' ? 'U' : 'AI';
-
-    const contentBox = document.createElement('div');
-    contentBox.className = `p-4 rounded-2xl max-w-[80%] msg-content ${sender === 'user' ? 'bg-slate-100 border border-slate-200 text-slate-800 rounded-tr-none' : 'bg-blue-50 border border-blue-100 text-slate-800 rounded-tl-none'}`;
-    
-    if (typeof marked !== 'undefined') {
-        contentBox.innerHTML = marked.parse(text);
-    } else {
-        contentBox.innerHTML = text.replace(/\n/g, '<br>');
-    }
-
-    msgDiv.appendChild(avatar);
-    msgDiv.appendChild(contentBox);
-    chatBox.appendChild(msgDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-function showTypingIndicator() {
-    const id = 'typing-' + Date.now();
-    const msgDiv = document.createElement('div');
-    msgDiv.id = id;
-    msgDiv.className = "flex gap-4";
-    msgDiv.innerHTML = `
-        <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold bg-blue-500 flex-shrink-0">AI</div>
-        <div class="p-4 rounded-2xl bg-blue-50 border border-blue-100 rounded-tl-none flex gap-1 items-center">
-            <span class="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></span>
-            <span class="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></span>
-            <span class="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
-        </div>
-    `;
-    chatBox.appendChild(msgDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
-    return id;
-}
-
-function removeElement(id) {
-    const el = document.getElementById(id);
-    if (el) el.remove();
-}
-
 // ==========================================
 // TÍNH NĂNG ĐỔI AVATAR (Lưu bằng LocalStorage)
 // ==========================================
@@ -161,6 +43,8 @@ let botAvatarStr = localStorage.getItem('botAvatar') || null;
 function openAvatarModal() {
     const modal = document.getElementById('avatar-modal');
     const box = document.getElementById('avatar-box');
+    if(!modal || !box) return;
+
     modal.classList.remove('hidden');
     setTimeout(() => { modal.classList.remove('opacity-0'); box.classList.remove('scale-95'); }, 10);
 
@@ -172,6 +56,8 @@ function openAvatarModal() {
 function closeAvatarModal() {
     const modal = document.getElementById('avatar-modal');
     const box = document.getElementById('avatar-box');
+    if(!modal || !box) return;
+
     modal.classList.add('opacity-0'); box.classList.add('scale-95');
     setTimeout(() => { modal.classList.add('hidden'); }, 300);
 }
@@ -208,12 +94,96 @@ function saveAvatars() {
     alert('Đã cập nhật ảnh đại diện thành công! Các tin nhắn tiếp theo sẽ áp dụng ảnh mới.');
 }
 
+// ==========================================
+// LOGIC CHO TRANG CHAT (chat.html)
+// ==========================================
+const chatBox = document.getElementById('chat-box');
+const userInput = document.getElementById('user-input');
+const sendBtn = document.getElementById('send-btn');
+const robotBubble = document.getElementById('robot-bubble');
+
+let chatHistory = [{ role: "system", content: "Bạn là AI giải bài tập SQL. Trả lời ngắn gọn, dùng Markdown format code." }];
+
+// Chỉ chạy logic chat nếu đang ở trang chat.html
+if (chatBox) {
+    document.addEventListener('DOMContentLoaded', () => {
+        addMessageToUI('ai', "Chào bạn! Mình là Robot hỗ trợ giải SQL. Hãy gửi cho mình bài tập của bạn nhé.");
+    });
+
+    if (sendBtn) sendBtn.addEventListener('click', handleSend);
+    if (userInput) userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
+}
+
+async function handleSend() {
+    const text = userInput.value.trim();
+    if (!text) return;
+
+    addMessageToUI('user', text);
+    userInput.value = '';
+    chatHistory.push({ role: "user", content: text });
+    
+    if (robotBubble) updateRobotBubble("Đang vắt óc suy nghĩ...");
+
+    const typingId = showTypingIndicator();
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: "llama-3.1-8b-instant",
+                messages: chatHistory,
+                temperature: 0.7
+            })
+        });
+
+        const data = await response.json();
+        removeElement(typingId);
+
+        if (!response.ok) {
+            addMessageToUI('ai', `❌ Lỗi API: Khởi tạo kết nối thất bại.`);
+            if (robotBubble) updateRobotBubble("Lỗi kết nối rồi!");
+            chatHistory.pop();
+            return;
+        }
+
+        if (data.choices && data.choices.length > 0) {
+            const aiReply = data.choices[0].message.content;
+            addMessageToUI('ai', aiReply);
+            chatHistory.push({ role: "assistant", content: aiReply });
+            
+            // Cập nhật bong bóng robot
+            if (robotBubble) {
+                let shortReply = aiReply.replace(/```[\s\S]*?```/g, "[Đoạn Code]").substring(0, 50) + "...";
+                updateRobotBubble(shortReply);
+            }
+        }
+    } catch (error) {
+        removeElement(typingId);
+        addMessageToUI('ai', "❌ Lỗi mạng. Vui lòng kiểm tra lại kết nối.");
+        if (robotBubble) updateRobotBubble("Mất mạng rồi!");
+    }
+}
+
+function updateRobotBubble(text) {
+    if (!robotBubble) return;
+    robotBubble.innerHTML = text;
+    robotBubble.classList.remove('opacity-0');
+    setTimeout(() => { robotBubble.classList.add('opacity-0'); }, 5000);
+}
+
+function removeElement(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+}
 
 // ==========================================
-// (XÓA HÀM CŨ) CẬP NHẬT 2 HÀM HIỂN THỊ TIN NHẮN DƯỚI ĐÂY
+// HÀM HIỂN THỊ UI (ĐÃ GỘP BẢN MỚI NHẤT VÀ XÓA BẢN CŨ)
 // ==========================================
 
 function addMessageToUI(sender, text) {
+    if (!chatBox) return;
+    
     const msgDiv = document.createElement('div');
     msgDiv.className = `flex gap-4 ${sender === 'user' ? 'flex-row-reverse' : ''}`;
     
@@ -244,6 +214,8 @@ function addMessageToUI(sender, text) {
 }
 
 function showTypingIndicator() {
+    if (!chatBox) return null;
+
     const id = 'typing-' + Date.now();
     const msgDiv = document.createElement('div');
     msgDiv.id = id;
