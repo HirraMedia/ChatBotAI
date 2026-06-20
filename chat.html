@@ -92,9 +92,7 @@
         import { getDatabase, ref, push, onChildAdded, onValue, off } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
         // =====================================
-        // 1. DÁN MÃ API KEY GROQ VÀO ĐÂY
-        const GROQ_API_KEY = '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';
-        // =====================================
+        const GROQ_API_KEY = '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';
         const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
         // 2. CẤU HÌNH FIREBASE
@@ -117,24 +115,23 @@
         let currentRoomId = null;
         let currentChatListener = null; 
 
-        // TẠO ID ẢO CHO KHÁCH (Lưu trong trình duyệt để khách f5 không mất tin nhắn)
+        // Bộ nhớ tạm thời cho Chat Riêng Tư (F5 là mất)
+        let sessionHistory = [{ role: "system", content: "Bạn là AI giải bài tập SQL. Trả lời bằng tiếng Việt, chuyên môn SQL." }];
+
         let guestUid = localStorage.getItem('guestUid');
         if (!guestUid) {
             guestUid = 'guest_' + Date.now() + Math.random().toString(36).substring(7);
             localStorage.setItem('guestUid', guestUid);
         }
 
-        // XÁC THỰC ĐĂNG NHẬP / KHÁCH
         const authBtn = document.getElementById('auth-action-btn');
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                // Nếu ĐÃ đăng nhập
                 currentUser = user;
                 document.getElementById('user-email-display').innerText = "Tài khoản: " + user.email;
                 authBtn.innerText = "Đăng xuất";
                 authBtn.className = "text-xs font-medium px-4 py-1.5 rounded-full border border-red-500 text-red-400 hover:bg-red-500 hover:text-white transition cursor-pointer";
             } else {
-                // Nếu CHƯA đăng nhập (Khách)
                 currentUser = null;
                 document.getElementById('user-email-display').innerText = "Trạng thái: Khách (Chưa đăng nhập)";
                 authBtn.innerText = "Đăng nhập";
@@ -142,58 +139,50 @@
             }
             
             loadRooms(); 
-            openPrivateChat(); // Ai vào web cũng được dùng Private Chat
+            openPrivateChat(); 
         });
 
-        // XỬ LÝ NÚT ĐĂNG NHẬP / ĐĂNG XUẤT
         authBtn.addEventListener('click', () => {
             if (currentUser) {
-                signOut(auth); // Nếu đang đăng nhập thì đăng xuất
+                signOut(auth); 
             } else {
-                window.location.href = 'auth.html'; // Nếu là Khách thì chuyển sang Đăng nhập
+                window.location.href = 'auth.html'; 
             }
         });
 
-        // CHUYỂN SANG CHẾ ĐỘ CHAT RIÊNG TƯ (Ai cũng dùng được)
         document.getElementById('btn-private-chat').addEventListener('click', openPrivateChat);
 
+        // --- SỬA LẠI HÀM NÀY: KHÔNG TẢI FIREBASE NỮA ---
         function openPrivateChat() {
             currentMode = 'private';
             currentRoomId = null;
 
             document.getElementById('btn-private-chat').classList.replace('bg-slate-800', 'bg-blue-600');
-            document.getElementById('room-title').innerHTML = `<span id="room-icon">🤖</span> Hỏi Đáp Riêng Tư`;
-            document.getElementById('user-input').placeholder = "Hỏi AI bài tập SQL của bạn (Chỉ bạn thấy)...";
+            document.getElementById('room-title').innerHTML = `<span id="room-icon">🤖</span> Hỏi Đáp Riêng Tư <span class="text-xs text-red-400 ml-2">(Chế độ ẩn danh)</span>`;
+            document.getElementById('user-input').placeholder = "Hỏi AI bài tập SQL (Tin nhắn không bị lưu)...";
 
             if (currentChatListener) off(currentChatListener);
-            document.getElementById('chat-box').innerHTML = '';
+            document.getElementById('chat-box').innerHTML = ''; // Xóa sạch màn hình
 
-            // Dùng ID thật nếu đã đăng nhập, dùng ID ảo nếu là Khách
-            const actualUid = currentUser ? currentUser.uid : guestUid;
-            const chatRef = ref(db, `private_messages/${actualUid}`);
-            currentChatListener = chatRef;
+            // Reset lại bộ nhớ của AI mỗi lần bấm vào tab này
+            sessionHistory = [{ role: "system", content: "Bạn là AI giải bài tập SQL. Trả lời bằng tiếng Việt, chuyên môn SQL." }];
             
-            onChildAdded(chatRef, (snapshot) => {
-                const msg = snapshot.val();
-                renderMessage(msg.sender, msg.text, msg.email);
-            });
+            // Render trực tiếp lời chào (Không qua Database)
+            renderMessage('ai', 'Chào bạn! Chế độ ẩn danh đã bật, tin nhắn của bạn sẽ không bị lưu lại. Gửi bài tập SQL cho mình nhé!', 'Trợ lý AI');
         }
 
-        // TẠO PHÒNG CHUNG (CHỈ CHO NGƯỜI ĐÃ ĐĂNG NHẬP)
         document.getElementById('btn-create-room').addEventListener('click', () => {
             if (!currentUser) {
                 alert("Bạn phải Đăng nhập hoặc Đăng ký để tạo nhóm chat chung!");
                 window.location.href = 'auth.html';
                 return;
             }
-
             const roomName = prompt("Nhập tên nhóm chat mới (Mọi người đều sẽ thấy nhóm này):");
             if (roomName && roomName.trim() !== "") {
                 push(ref(db, 'rooms'), { name: roomName.trim(), timestamp: Date.now() });
             }
         });
 
-        // TẢI DANH SÁCH PHÒNG CHUNG
         function loadRooms() {
             const roomListDiv = document.getElementById('room-list');
             onValue(ref(db, 'rooms'), (snapshot) => {
@@ -215,7 +204,6 @@
             });
         }
 
-        // VÀO PHÒNG CHAT CHUNG (CHỈ CHO NGƯỜI ĐÃ ĐĂNG NHẬP)
         function joinRoom(roomId, roomName) {
             if (!currentUser) {
                 alert("Bạn phải Đăng nhập hoặc Đăng ký để tham gia nhóm chat này!");
@@ -242,46 +230,51 @@
             });
         }
 
-        // GỬI TIN NHẮN 
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
 
         sendBtn.addEventListener('click', handleSend);
         userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
 
+        // --- SỬA LẠI HÀM GỬI: PHÂN TÁCH LƯU DB VÀ KHÔNG LƯU DB ---
         async function handleSend() {
             const text = userInput.value.trim();
             if (!text) return;
             userInput.value = '';
 
-            // Kiểm tra Uid và Tên người gửi
-            const actualUid = currentUser ? currentUser.uid : guestUid;
             const senderEmail = currentUser ? currentUser.email : "Khách";
             
-            const dbPath = (currentMode === 'private') 
-                ? `private_messages/${actualUid}` 
-                : `group_messages/${currentRoomId}`;
+            // Xử lý gửi tin nhắn của User
+            if (currentMode === 'private') {
+                // Chỉ hiển thị UI và lưu vào RAM, KHÔNG PUSH Firebase
+                renderMessage('user', text, senderEmail);
+                sessionHistory.push({ role: "user", content: text });
+            } else {
+                // Nhóm chung: Phải PUSH Firebase để đồng bộ cho mọi người
+                const dbPath = `group_messages/${currentRoomId}`;
+                push(ref(db, dbPath), { sender: 'user', text: text, email: senderEmail, timestamp: Date.now() });
+            }
 
-            // Lưu tin nhắn của User
-            push(ref(db, dbPath), {
-                sender: 'user',
-                text: text,
-                email: senderEmail,
-                timestamp: Date.now()
-            });
-
-            // AI Suy nghĩ
             document.getElementById('robot-svg').classList.add('robot-thinking');
             document.getElementById('robot-bubble').innerText = "Đang tra cứu dữ liệu...";
             document.getElementById('robot-bubble').style.opacity = 1;
 
             try {
+                // Lấy mảng tin nhắn để gửi cho AI
+                let apiMessages = [];
+                if (currentMode === 'private') {
+                    apiMessages = sessionHistory; // Có nhớ ngữ cảnh
+                } else {
+                    // Chat nhóm chỉ gửi câu hiện tại để tránh tốn token
+                    apiMessages = [{ role: "user", content: `(Trả lời bằng tiếng Việt, chuyên môn SQL) ${text}` }];
+                }
+
                 const response = await fetch(GROQ_API_URL, {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: "llama-3.1-8b-instant",
-                        messages: [{ role: "user", content: `(Trả lời bằng tiếng Việt, chuyên môn SQL) ${text}` }]
+                        messages: apiMessages
                     })
                 });
 
@@ -292,19 +285,22 @@
                 if (data.choices && data.choices.length > 0) {
                     const aiReply = data.choices[0].message.content;
                     
-                    push(ref(db, dbPath), {
-                        sender: 'ai',
-                        text: aiReply,
-                        email: 'Trợ lý AI',
-                        timestamp: Date.now()
-                    });
+                    if (currentMode === 'private') {
+                        // Chỉ hiển thị UI và lưu RAM, KHÔNG PUSH Firebase
+                        renderMessage('ai', aiReply, 'Trợ lý AI');
+                        sessionHistory.push({ role: "assistant", content: aiReply });
+                    } else {
+                        // Nhóm chung: PUSH Firebase AI reply
+                        const dbPath = `group_messages/${currentRoomId}`;
+                        push(ref(db, dbPath), { sender: 'ai', text: aiReply, email: 'Trợ lý AI', timestamp: Date.now() });
+                    }
                 }
             } catch (error) {
                 document.getElementById('robot-svg').classList.remove('robot-thinking');
+                if(currentMode === 'private') renderMessage('ai', "Lỗi kết nối API rồi bạn ơi!", 'Trợ lý AI');
             }
         }
 
-        // VẼ TIN NHẮN LÊN MÀN HÌNH
         function renderMessage(sender, text, email) {
             const chatBox = document.getElementById('chat-box');
             const msgDiv = document.createElement('div');
