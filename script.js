@@ -39,6 +39,16 @@ const authGearIcon = document.getElementById('auth-gear-icon');
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
+        
+        // --- ĐOẠN MỚI THÊM: TỰ ĐỘNG TẢI LẠI AVATAR TỪ FIREBASE ---
+        const userRef = ref(db, `users/${user.uid}`);
+        const userSnap = await get(userRef);
+        if (userSnap.exists() && userSnap.val().avatar) {
+            userAvatarStr = userSnap.val().avatar;
+            localStorage.setItem('userAvatar', userAvatarStr);
+        }
+        // --------------------------------------------------------
+
         const displayName = user.displayName || user.email;
         document.getElementById('user-email-display').innerText = "Tài khoản: " + displayName;
         
@@ -114,7 +124,6 @@ async function checkInviteLink() {
             role: 'member'
         });
 
-        // BẮN THÔNG BÁO HỆ THỐNG ĐÃ THAM GIA
         push(ref(db, `group_messages/${inviteRoomId}`), {
             sender: 'system', text: `${myName} đã tham gia nhóm.`, timestamp: Date.now()
         });
@@ -159,7 +168,7 @@ document.getElementById('settings-avatar-upload').addEventListener('change', (e)
     }
 });
 
-document.getElementById('save-settings-btn').addEventListener('click', () => {
+document.getElementById('save-settings-btn').addEventListener('click', async () => {
     const newName = document.getElementById('settings-name-input').value.trim();
     if (!newName) return alert("Tên không được để trống!");
 
@@ -169,7 +178,17 @@ document.getElementById('save-settings-btn').addEventListener('click', () => {
     }
 
     document.getElementById('save-settings-btn').innerText = "Đang lưu...";
-    updateProfile(currentUser, { displayName: newName }).then(() => {
+    
+    try {
+        await updateProfile(currentUser, { displayName: newName });
+        
+        // --- ĐOẠN MỚI THÊM: LƯU AVATAR VÀO FIREBASE KHI BẤM LƯU ---
+        await set(ref(db, `users/${currentUser.uid}`), {
+            name: newName,
+            avatar: userAvatarStr
+        });
+        // ---------------------------------------------------------
+
         document.getElementById('save-settings-btn').innerText = "Lưu Thay Đổi";
         document.getElementById('user-email-display').innerText = "Tài khoản: " + newName;
         document.getElementById('settings-modal').classList.add('hidden');
@@ -178,7 +197,10 @@ document.getElementById('save-settings-btn').addEventListener('click', () => {
             update(ref(db, `rooms/${currentRoomId}/members/${currentUser.uid}`), { name: newName, avatar: userAvatarStr });
         }
         alert("Cập nhật thông tin thành công!");
-    });
+    } catch (error) {
+        alert("Lỗi: " + error.message);
+        document.getElementById('save-settings-btn').innerText = "Lưu Thay Đổi";
+    }
 });
 
 document.getElementById('logout-settings-btn').addEventListener('click', () => {
@@ -245,7 +267,6 @@ document.getElementById('confirm-create-room').addEventListener('click', async (
         }
     });
 
-    // Thông báo hệ thống tạo nhóm
     push(ref(db, `group_messages/${newRoomRef.key}`), { sender: 'system', text: `${myName} đã tạo nhóm.`, timestamp: Date.now() });
     
     document.getElementById('create-room-modal').classList.add('hidden');
@@ -434,11 +455,9 @@ function renderDrawerData() {
     const isCreator = myRole === 'creator';
     const isAdmin = myRole === 'admin' || isCreator;
 
-    // Ảnh nhóm
     const avatarBox = document.getElementById('drawer-group-avatar');
     avatarBox.innerHTML = currentRoomData.avatar ? `<img src="${currentRoomData.avatar}" class="w-full h-full object-cover">` : `<span class="text-slate-400 font-bold text-xl">#</span>`;
     
-    // Tên nhóm
     const nameInput = document.getElementById('drawer-group-name');
     nameInput.value = currentRoomData.name;
     const btnSaveName = document.getElementById('btn-save-group-name');
@@ -455,7 +474,6 @@ function renderDrawerData() {
         btnSaveName.classList.add('hidden');
     }
 
-    // Nút chức năng phía dưới cùng
     document.getElementById('drawer-admin-actions').classList.remove('hidden');
     if (isCreator) {
         document.getElementById('btn-delete-group').classList.remove('hidden');
@@ -465,7 +483,6 @@ function renderDrawerData() {
         document.getElementById('btn-leave-group').classList.remove('hidden');
     }
 
-    // Danh sách thành viên
     const membersArr = Object.entries(currentRoomData.members);
     document.getElementById('member-count').innerText = membersArr.length;
     const listDiv = document.getElementById('drawer-member-list');
@@ -525,7 +542,6 @@ document.getElementById('btn-copy-link').addEventListener('click', () => {
     navigator.clipboard.writeText(inviteLink).then(() => alert("Đã copy link mời! Hãy gửi cho bạn bè nhé."));
 });
 
-// Chức năng XÓA NHÓM (Dành cho người tạo)
 document.getElementById('btn-delete-group').addEventListener('click', () => {
     if(confirm("Bạn có chắc chắn muốn giải tán nhóm này vĩnh viễn?")) {
         remove(ref(db, `rooms/${currentRoomId}`));
@@ -533,13 +549,11 @@ document.getElementById('btn-delete-group').addEventListener('click', () => {
     }
 });
 
-// Chức năng RỜI NHÓM (Dành cho thành viên bình thường)
 document.getElementById('btn-leave-group').addEventListener('click', async () => {
     if(confirm("Bạn có chắc chắn muốn rời nhóm này?")) {
         const myName = currentUser.displayName || currentUser.email;
         await push(ref(db, `group_messages/${currentRoomId}`), { sender: 'system', text: `${myName} đã rời nhóm.`, timestamp: Date.now() });
         await remove(ref(db, `rooms/${currentRoomId}/members/${currentUser.uid}`));
-        // Màn hình sẽ tự động bị đẩy về chat riêng nhờ vào roomListener!
     }
 });
 
@@ -626,13 +640,12 @@ function renderMessage(sender, text, displayN, customAvatar, idOverride = null) 
     const msgDiv = document.createElement('div');
     if (idOverride) msgDiv.id = idOverride;
     
-    // NẾU LÀ THÔNG BÁO HỆ THỐNG
     if (sender === 'system') {
         msgDiv.className = "flex justify-center w-full my-3";
         msgDiv.innerHTML = `<span class="text-xs text-slate-500 bg-slate-200/60 px-4 py-1.5 rounded-full font-medium text-center shadow-sm">${text}</span>`;
         chatBox.appendChild(msgDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
-        return; // Thoát ra, không render kiểu tin nhắn bình thường
+        return; 
     }
 
     const myName = currentUser ? (currentUser.displayName || currentUser.email) : "Khách";
