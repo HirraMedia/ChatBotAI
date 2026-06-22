@@ -42,9 +42,8 @@ onAuthStateChanged(auth, async (user) => {
         const displayName = user.displayName || user.email;
         document.getElementById('user-email-display').innerText = "Tài khoản: " + displayName;
         
-        // Đổi chữ ở đây cho ngắn gọn
-        authBtnText.innerText = "Tài khoản"; 
-        authGearIcon.classList.remove('hidden'); 
+        authBtnText.innerText = "Tài khoản";
+        authGearIcon.classList.remove('hidden');
         
         await checkInviteLink();
     } else {
@@ -60,7 +59,6 @@ onAuthStateChanged(auth, async (user) => {
 authBtn.addEventListener('click', () => {
     if (!currentUser) window.location.href = 'auth.html'; 
     else {
-        // Mở cài đặt
         document.getElementById('settings-modal').classList.remove('hidden');
         document.getElementById('settings-name-input').value = currentUser.displayName || '';
         tempSettingsAvatar = userAvatarStr;
@@ -76,7 +74,6 @@ async function checkInviteLink() {
     const inviteRoomId = urlParams.get('join');
     if (!inviteRoomId || !currentUser) return;
 
-    // Lấy thông tin phòng
     const snapshot = await get(ref(db, `rooms/${inviteRoomId}`));
     if (!snapshot.exists()) {
         alert("Nhóm không tồn tại hoặc đã bị xóa!");
@@ -86,15 +83,12 @@ async function checkInviteLink() {
 
     const rData = snapshot.val();
     
-    // Kiểm tra xem đã là thành viên chưa
     if (rData.members && rData.members[currentUser.uid]) {
-        // Đã là thành viên, join luôn
         executeJoinRoom(inviteRoomId, rData);
         window.history.replaceState({}, document.title, window.location.pathname);
         return;
     }
 
-    // Hiện popup mời
     document.getElementById('invite-link-modal').classList.remove('hidden');
     document.getElementById('invite-link-modal').children[0].classList.replace('scale-95', 'scale-100');
     
@@ -107,18 +101,22 @@ async function checkInviteLink() {
     if (rData.type === 'private') pwdArea.classList.remove('hidden');
     else pwdArea.classList.add('hidden');
 
-    // Nút tham gia
     document.getElementById('btn-accept-invite').onclick = async () => {
         if (rData.type === 'private') {
             const pwd = document.getElementById('invite-password').value;
             if (pwd !== rData.password) return alert("Mật khẩu nhóm không đúng!");
         }
         
-        // Thêm vào database members
+        const myName = currentUser.displayName || currentUser.email;
         await set(ref(db, `rooms/${inviteRoomId}/members/${currentUser.uid}`), {
-            name: currentUser.displayName || currentUser.email,
+            name: myName,
             avatar: userAvatarStr,
             role: 'member'
+        });
+
+        // BẮN THÔNG BÁO HỆ THỐNG ĐÃ THAM GIA
+        push(ref(db, `group_messages/${inviteRoomId}`), {
+            sender: 'system', text: `${myName} đã tham gia nhóm.`, timestamp: Date.now()
         });
 
         document.getElementById('invite-link-modal').classList.add('hidden');
@@ -126,13 +124,11 @@ async function checkInviteLink() {
         executeJoinRoom(inviteRoomId, rData);
     };
 
-    // Nút từ chối
     document.getElementById('btn-decline-invite').onclick = () => {
         document.getElementById('invite-link-modal').classList.add('hidden');
         window.history.replaceState({}, document.title, window.location.pathname);
     };
 }
-
 
 /* ==========================================
    CÀI ĐẶT NGƯỜI DÙNG
@@ -149,9 +145,7 @@ function updateSettingsPreview() {
     }
 }
 
-document.getElementById('close-settings-modal').addEventListener('click', () => {
-    document.getElementById('settings-modal').classList.add('hidden');
-});
+document.getElementById('close-settings-modal').addEventListener('click', () => { document.getElementById('settings-modal').classList.add('hidden'); });
 
 document.getElementById('settings-avatar-upload').addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -180,7 +174,6 @@ document.getElementById('save-settings-btn').addEventListener('click', () => {
         document.getElementById('user-email-display').innerText = "Tài khoản: " + newName;
         document.getElementById('settings-modal').classList.add('hidden');
         
-        // Update user name in current room members if in a group
         if (currentMode === 'group' && currentRoomId) {
             update(ref(db, `rooms/${currentRoomId}/members/${currentUser.uid}`), { name: newName, avatar: userAvatarStr });
         }
@@ -243,22 +236,17 @@ document.getElementById('confirm-create-room').addEventListener('click', async (
     if (!name) return alert("Vui lòng nhập tên nhóm!");
     if (roomType === 'private' && !password) return alert("Vui lòng nhập mật khẩu cho nhóm bảo mật!");
 
+    const myName = currentUser.displayName || currentUser.email;
     const newRoomRef = push(ref(db, 'rooms'));
     await set(newRoomRef, { 
-        name: name, 
-        type: roomType, 
-        password: roomType === 'private' ? password : "",
-        avatar: roomAvatarBase64,
-        timestamp: Date.now(),
-        creatorId: currentUser.uid,
+        name: name, type: roomType, password: roomType === 'private' ? password : "", avatar: roomAvatarBase64, timestamp: Date.now(), creatorId: currentUser.uid,
         members: {
-            [currentUser.uid]: {
-                name: currentUser.displayName || currentUser.email,
-                avatar: userAvatarStr,
-                role: 'creator' // Roles: creator, admin, member
-            }
+            [currentUser.uid]: { name: myName, avatar: userAvatarStr, role: 'creator' }
         }
     });
+
+    // Thông báo hệ thống tạo nhóm
+    push(ref(db, `group_messages/${newRoomRef.key}`), { sender: 'system', text: `${myName} đã tạo nhóm.`, timestamp: Date.now() });
     
     document.getElementById('create-room-modal').classList.add('hidden');
     document.getElementById('room-name-input').value = "";
@@ -276,15 +264,11 @@ function loadRooms() {
             const room = childSnapshot.val();
             const roomId = childSnapshot.key;
             
-            // XÓA ĐIỀU KIỆN ẨN NHÓM ĐỂ AI CŨNG THẤY ĐƯỢC NHÓM
-            
             const btn = document.createElement('div');
             btn.className = "group flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 cursor-pointer transition-all border border-transparent";
-            
             let avatarHtml = room.avatar ? `<img src="${room.avatar}" class="w-full h-full object-cover">` : `#`;
             let lockIcon = room.type === 'private' ? `<span class="text-xs text-slate-400">🔒</span>` : '';
 
-            // Nút X (btn-delete-room-super)
             btn.innerHTML = `
                 <div class="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold overflow-hidden">${avatarHtml}</div>
                 <h3 class="font-medium text-sm text-slate-300 group-hover:text-white flex-1 truncate">${room.name}</h3>
@@ -299,7 +283,6 @@ function loadRooms() {
                 handleJoinRoomReq(roomId, room);
             });
 
-            // LOGIC QUYỀN TỐI CAO
             const deleteBtn = btn.querySelector('.btn-delete-room-super');
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation(); 
@@ -309,13 +292,9 @@ function loadRooms() {
                         remove(ref(db, `rooms/${roomId}`));
                         remove(ref(db, `group_messages/${roomId}`));
                         alert("✅ Đã xóa nhóm thành công!");
-                        if (currentRoomId === roomId) {
-                            openPrivateChat();
-                        }
+                        if (currentRoomId === roomId) openPrivateChat();
                     }
-                } else if (pass !== null) {
-                    alert("❌ Mật khẩu cấp cao không chính xác!");
-                }
+                } else if (pass !== null) alert("❌ Mật khẩu cấp cao không chính xác!");
             });
 
             roomListDiv.appendChild(btn);
@@ -334,19 +313,14 @@ function handleJoinRoomReq(roomId, roomData) {
 
     const isMember = roomData.members && roomData.members[currentUser.uid];
 
-    // Nếu đã là member rồi thì vào thẳng không cần hỏi pass
     if (isMember || roomData.type === 'public') {
         if (!isMember) {
-            // Public chưa join -> Join
-            set(ref(db, `rooms/${roomId}/members/${currentUser.uid}`), {
-                name: currentUser.displayName || currentUser.email,
-                avatar: userAvatarStr,
-                role: 'member'
-            });
+            const myName = currentUser.displayName || currentUser.email;
+            set(ref(db, `rooms/${roomId}/members/${currentUser.uid}`), { name: myName, avatar: userAvatarStr, role: 'member' });
+            push(ref(db, `group_messages/${roomId}`), { sender: 'system', text: `${myName} đã tham gia nhóm.`, timestamp: Date.now() });
         }
         executeJoinRoom(roomId, roomData);
     } else {
-        // Nhóm private chưa join -> Yêu cầu pass
         pendingRoomId = roomId;
         pendingRoomData = roomData;
         document.getElementById('join-password').value = "";
@@ -360,17 +334,16 @@ document.getElementById('confirm-join-room').addEventListener('click', async () 
     const pass = document.getElementById('join-password').value;
     if (pass !== pendingRoomData.password) return alert("Mật khẩu nhóm không đúng!");
     
-    await set(ref(db, `rooms/${pendingRoomId}/members/${currentUser.uid}`), {
-        name: currentUser.displayName || currentUser.email,
-        avatar: userAvatarStr,
-        role: 'member'
-    });
+    const myName = currentUser.displayName || currentUser.email;
+    await set(ref(db, `rooms/${pendingRoomId}/members/${currentUser.uid}`), { name: myName, avatar: userAvatarStr, role: 'member' });
+    
+    push(ref(db, `group_messages/${pendingRoomId}`), { sender: 'system', text: `${myName} đã tham gia nhóm.`, timestamp: Date.now() });
 
     document.getElementById('join-room-modal').classList.add('hidden');
     executeJoinRoom(pendingRoomId, pendingRoomData);
 });
 
-let roomListener = null; // Lắng nghe data thay đổi trong phòng
+let roomListener = null;
 
 function executeJoinRoom(roomId, roomData) {
     currentMode = 'group';
@@ -378,27 +351,24 @@ function executeJoinRoom(roomId, roomData) {
     currentRoomData = roomData;
 
     document.getElementById('btn-private-chat').classList.replace('bg-blue-600', 'bg-slate-800');
-    document.getElementById('btn-group-options').classList.remove('hidden'); // Mở khóa nút Tùy chọn nhóm
+    document.getElementById('btn-group-options').classList.remove('hidden'); 
 
     document.getElementById('room-title').innerHTML = `<span id="room-icon">🌍</span> Nhóm: <span id="header-room-name">${roomData.name}</span>`;
     document.getElementById('user-input').placeholder = "Nhắn với nhóm (Tag @bot để gọi AI)...";
 
-    // Lắng nghe thay đổi của phòng (Tên, Ảnh, Thành viên)
     if (roomListener) off(roomListener);
     roomListener = ref(db, `rooms/${roomId}`);
     onValue(roomListener, (snap) => {
         if (snap.exists()) {
             currentRoomData = snap.val();
-            // Nếu bị kick
             if (!currentRoomData.members || !currentRoomData.members[currentUser.uid]) {
-                alert("Bạn đã bị quản trị viên mời ra khỏi nhóm!");
+                alert("Bạn đã rời khỏi (hoặc bị kick khỏi) nhóm này!");
                 openPrivateChat();
                 return;
             }
             document.getElementById('header-room-name').innerText = currentRoomData.name;
             renderDrawerData();
         } else {
-            // Nhóm bị xóa
             alert("Nhóm đã bị giải tán!");
             openPrivateChat();
         }
@@ -446,7 +416,7 @@ function openPrivateChat() {
 }
 
 /* ==========================================
-   DRAWER TÙY CHỌN NHÓM
+   DRAWER TÙY CHỌN NHÓM & QUẢN LÝ THÀNH VIÊN
 ========================================== */
 const drawer = document.getElementById('group-drawer');
 document.getElementById('btn-group-options').addEventListener('click', () => {
@@ -455,11 +425,8 @@ document.getElementById('btn-group-options').addEventListener('click', () => {
 });
 document.getElementById('close-drawer-btn').addEventListener('click', closeGroupDrawer);
 
-function closeGroupDrawer() {
-    drawer.classList.add('translate-x-full');
-}
+function closeGroupDrawer() { drawer.classList.add('translate-x-full'); }
 
-// Render dữ liệu lên Drawer
 function renderDrawerData() {
     if (!currentRoomData || !currentRoomData.members) return;
     
@@ -467,11 +434,11 @@ function renderDrawerData() {
     const isCreator = myRole === 'creator';
     const isAdmin = myRole === 'admin' || isCreator;
 
-    // Ảnh
+    // Ảnh nhóm
     const avatarBox = document.getElementById('drawer-group-avatar');
     avatarBox.innerHTML = currentRoomData.avatar ? `<img src="${currentRoomData.avatar}" class="w-full h-full object-cover">` : `<span class="text-slate-400 font-bold text-xl">#</span>`;
     
-    // Tên
+    // Tên nhóm
     const nameInput = document.getElementById('drawer-group-name');
     nameInput.value = currentRoomData.name;
     const btnSaveName = document.getElementById('btn-save-group-name');
@@ -488,11 +455,17 @@ function renderDrawerData() {
         btnSaveName.classList.add('hidden');
     }
 
-    // Xóa Nhóm (Chỉ Creator)
-    if (isCreator) document.getElementById('drawer-admin-actions').classList.remove('hidden');
-    else document.getElementById('drawer-admin-actions').classList.add('hidden');
+    // Nút chức năng phía dưới cùng
+    document.getElementById('drawer-admin-actions').classList.remove('hidden');
+    if (isCreator) {
+        document.getElementById('btn-delete-group').classList.remove('hidden');
+        document.getElementById('btn-leave-group').classList.add('hidden');
+    } else {
+        document.getElementById('btn-delete-group').classList.add('hidden');
+        document.getElementById('btn-leave-group').classList.remove('hidden');
+    }
 
-    // List Members
+    // Danh sách thành viên
     const membersArr = Object.entries(currentRoomData.members);
     document.getElementById('member-count').innerText = membersArr.length;
     const listDiv = document.getElementById('drawer-member-list');
@@ -500,18 +473,15 @@ function renderDrawerData() {
 
     membersArr.forEach(([uid, mData]) => {
         const isMe = uid === currentUser.uid;
-        
         let roleBadge = '';
         if (mData.role === 'creator') roleBadge = `<span class="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded border border-red-200">Người tạo</span>`;
         else if (mData.role === 'admin') roleBadge = `<span class="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded border border-blue-200">Quản trị</span>`;
 
-        // Nút Kéo Thả (Kick / Admin)
         let actionsHtml = '';
-        if (!isMe && isAdmin) { // Không tự xử mình, admin xử người khác
-            // Không được xử creator, Admin ko xử được Admin khác
+        if (!isMe && isAdmin) { 
             if (mData.role !== 'creator' && !(myRole === 'admin' && mData.role === 'admin')) {
                 let promoteBtn = isCreator && mData.role === 'member' ? `<button onclick="promoteAdmin('${uid}')" class="text-xs text-blue-600 hover:underline">Thăng cấp</button>` : '';
-                let kickBtn = `<button onclick="kickMember('${uid}')" class="text-xs text-red-600 hover:underline">Kick</button>`;
+                let kickBtn = `<button onclick="kickMember('${uid}', '${mData.name}')" class="text-xs text-red-600 hover:underline">Kick</button>`;
                 actionsHtml = `<div class="flex gap-2">${promoteBtn}${kickBtn}</div>`;
             }
         }
@@ -533,14 +503,11 @@ function renderDrawerData() {
     });
 }
 
-// Hành động Drawer
 document.getElementById('edit-group-avatar').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
         const reader = new FileReader();
-        reader.onload = function(event) {
-            update(ref(db, `rooms/${currentRoomId}`), { avatar: event.target.result });
-        };
+        reader.onload = function(event) { update(ref(db, `rooms/${currentRoomId}`), { avatar: event.target.result }); };
         reader.readAsDataURL(file);
     }
 });
@@ -555,11 +522,10 @@ document.getElementById('btn-save-group-name').addEventListener('click', () => {
 
 document.getElementById('btn-copy-link').addEventListener('click', () => {
     const inviteLink = window.location.origin + window.location.pathname + '?join=' + currentRoomId;
-    navigator.clipboard.writeText(inviteLink).then(() => {
-        alert("Đã copy link mời! Hãy gửi cho bạn bè nhé.");
-    });
+    navigator.clipboard.writeText(inviteLink).then(() => alert("Đã copy link mời! Hãy gửi cho bạn bè nhé."));
 });
 
+// Chức năng XÓA NHÓM (Dành cho người tạo)
 document.getElementById('btn-delete-group').addEventListener('click', () => {
     if(confirm("Bạn có chắc chắn muốn giải tán nhóm này vĩnh viễn?")) {
         remove(ref(db, `rooms/${currentRoomId}`));
@@ -567,10 +533,20 @@ document.getElementById('btn-delete-group').addEventListener('click', () => {
     }
 });
 
-// Các hàm thao tác với member global để nút trong HTML gọi được
-window.kickMember = (uid) => {
+// Chức năng RỜI NHÓM (Dành cho thành viên bình thường)
+document.getElementById('btn-leave-group').addEventListener('click', async () => {
+    if(confirm("Bạn có chắc chắn muốn rời nhóm này?")) {
+        const myName = currentUser.displayName || currentUser.email;
+        await push(ref(db, `group_messages/${currentRoomId}`), { sender: 'system', text: `${myName} đã rời nhóm.`, timestamp: Date.now() });
+        await remove(ref(db, `rooms/${currentRoomId}/members/${currentUser.uid}`));
+        // Màn hình sẽ tự động bị đẩy về chat riêng nhờ vào roomListener!
+    }
+});
+
+window.kickMember = (uid, memberName) => {
     if(confirm("Kick thành viên này khỏi nhóm?")) {
         remove(ref(db, `rooms/${currentRoomId}/members/${uid}`));
+        push(ref(db, `group_messages/${currentRoomId}`), { sender: 'system', text: `${memberName} đã bị mời ra khỏi nhóm.`, timestamp: Date.now() });
     }
 };
 
@@ -594,14 +570,7 @@ async function handleSend() {
 
     const isGroup = currentMode === 'group';
     const senderName = currentUser ? (currentUser.displayName || currentUser.email) : "Khách";
-
-    const messageData = { 
-        sender: 'user', 
-        text: text, 
-        name: senderName,
-        avatar: userAvatarStr,
-        timestamp: Date.now() 
-    };
+    const messageData = { sender: 'user', text: text, name: senderName, avatar: userAvatarStr, timestamp: Date.now() };
 
     if (isGroup) push(ref(db, `group_messages/${currentRoomId}`), messageData);
     else {
@@ -657,6 +626,15 @@ function renderMessage(sender, text, displayN, customAvatar, idOverride = null) 
     const msgDiv = document.createElement('div');
     if (idOverride) msgDiv.id = idOverride;
     
+    // NẾU LÀ THÔNG BÁO HỆ THỐNG
+    if (sender === 'system') {
+        msgDiv.className = "flex justify-center w-full my-3";
+        msgDiv.innerHTML = `<span class="text-xs text-slate-500 bg-slate-200/60 px-4 py-1.5 rounded-full font-medium text-center shadow-sm">${text}</span>`;
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return; // Thoát ra, không render kiểu tin nhắn bình thường
+    }
+
     const myName = currentUser ? (currentUser.displayName || currentUser.email) : "Khách";
     const isMe = (sender === 'user' && displayN === myName);
     const isAi = (sender === 'ai');
