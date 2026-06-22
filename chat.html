@@ -2,23 +2,27 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Phòng Chat - AI SQL</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="icon" href="https://cdn-icons-png.flaticon.com/512/4712/4712010.png" type="image/png">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-slate-100 flex h-screen overflow-hidden">
+<body class="bg-slate-100 flex overflow-hidden">
 
-    <!-- SIDEBAR TRÁI -->
-    <aside class="w-72 bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300 z-30 shadow-2xl flex-shrink-0">
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 z-30 hidden md:hidden transition-opacity"></div>
+
+    <aside id="main-sidebar" class="fixed md:relative inset-y-0 left-0 w-72 bg-slate-900 border-r border-slate-800 flex flex-col transition-transform duration-300 z-40 shadow-2xl flex-shrink-0 transform -translate-x-full md:translate-x-0">
         <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
             <h1 class="text-xl font-bold gradient-text">SQL_AI_Hub</h1>
-            <button id="auth-action-btn" class="flex flex-shrink-0 items-center justify-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border border-blue-500 text-blue-400 hover:bg-blue-600 hover:text-white transition cursor-pointer whitespace-nowrap" title="Cài đặt tài khoản">
-                <span id="auth-btn-text">Đăng nhập</span>
-                <svg id="auth-gear-icon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-            </button>
+            <div class="flex items-center gap-2">
+                <button id="auth-action-btn" class="flex flex-shrink-0 items-center justify-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border border-blue-500 text-blue-400 hover:bg-blue-600 hover:text-white transition cursor-pointer whitespace-nowrap" title="Cài đặt tài khoản">
+                    <span id="auth-btn-text">Đăng nhập</span>
+                    <svg id="auth-gear-icon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                </button>
+                <button id="btn-close-sidebar" class="md:hidden text-slate-400 hover:text-white p-1">✖</button>
+            </div>
         </div>
         
         <div class="p-4 border-b border-slate-800">
@@ -43,35 +47,38 @@
         </div>
     </aside>
 
-    <!-- KHU VỰC CHAT CHÍNH -->
     <div class="flex-1 h-full flex flex-col bg-slate-50 relative z-10 w-full overflow-hidden">
-        <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm z-20">
-            <div>
-                <h2 id="room-title" class="font-bold text-lg text-slate-800 flex items-center gap-2">
-                    <span id="room-icon">🤖</span> Khu Vực Hỏi Đáp Riêng
-                </h2>
-                <p id="user-email-display" class="text-xs text-slate-500 font-medium">Đang tải...</p>
+        <div class="bg-white border-b border-slate-200 px-4 py-3 md:px-6 md:py-4 flex justify-between items-center shadow-sm z-20">
+            <div class="flex items-center gap-3">
+                <button id="btn-open-sidebar" class="md:hidden p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+                <div>
+                    <h2 id="room-title" class="font-bold text-base md:text-lg text-slate-800 flex items-center gap-2">
+                        <span id="room-icon">🤖</span> Khu Vực Hỏi Đáp Riêng
+                    </h2>
+                    <p id="user-email-display" class="text-[10px] md:text-xs text-slate-500 font-medium">Đang tải...</p>
+                </div>
             </div>
             <button id="btn-group-options" class="hidden p-2 text-slate-500 hover:bg-slate-100 rounded-full transition">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
             </button>
         </div>
         
-        <div id="chat-box" class="flex-1 overflow-y-auto p-6 space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-slate-50">
+        <div id="chat-box" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-slate-50">
             <div class="text-center text-slate-400 mt-10">Đang tải dữ liệu...</div>
         </div>
 
-        <div class="p-4 bg-white border-t border-slate-200 z-20">
+        <div class="p-3 md:p-4 bg-white border-t border-slate-200 z-20">
             <div class="relative flex items-center max-w-5xl mx-auto">
-                <input type="text" id="user-input" placeholder="Nhập câu hỏi... (Tag @bot để gọi AI trong nhóm)" class="w-full bg-slate-100 border border-slate-300 text-slate-800 rounded-2xl pl-6 pr-14 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button id="send-btn" class="absolute right-3 bg-blue-600 hover:bg-blue-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                <input type="text" id="user-input" placeholder="Nhập câu hỏi... (@bot để gọi AI)" class="w-full bg-slate-100 border border-slate-300 text-slate-800 rounded-2xl pl-4 md:pl-6 pr-12 md:pr-14 py-3 md:py-4 text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button id="send-btn" class="absolute right-2 md:right-3 bg-blue-600 hover:bg-blue-700 text-white w-9 h-9 md:w-10 md:h-10 rounded-xl flex items-center justify-center transition">
+                    <svg class="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
                 </button>
             </div>
         </div>
 
-        <!-- NGĂN KÉO TÙY CHỌN NHÓM -->
-        <div id="group-drawer" class="absolute right-0 top-0 h-full w-80 bg-white border-l border-slate-200 shadow-2xl transform translate-x-full transition-transform duration-300 z-30 flex flex-col">
+        <div id="group-drawer" class="absolute right-0 top-0 h-full w-72 md:w-80 bg-white border-l border-slate-200 shadow-2xl transform translate-x-full transition-transform duration-300 z-50 flex flex-col">
             <div class="p-4 border-b flex justify-between items-center bg-slate-50">
                 <h3 class="font-bold text-slate-800">Thông tin nhóm</h3>
                 <button id="close-drawer-btn" class="text-slate-400 hover:text-red-500 font-bold">✖</button>
@@ -79,7 +86,7 @@
             
             <div class="p-5 flex flex-col items-center border-b">
                 <label for="edit-group-avatar" class="cursor-pointer relative group mb-3">
-                    <div id="drawer-group-avatar" class="w-20 h-20 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-2 border-slate-300"></div>
+                    <div id="drawer-group-avatar" class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-2 border-slate-300"></div>
                     <div id="edit-avatar-overlay" class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hidden">
                         <span class="text-white text-xs">Đổi</span>
                     </div>
@@ -87,40 +94,39 @@
                 <input type="file" id="edit-group-avatar" accept="image/*" class="hidden">
                 
                 <div class="flex items-center gap-2 w-full">
-                    <input type="text" id="drawer-group-name" class="font-bold text-lg text-center bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none w-full" readonly>
+                    <input type="text" id="drawer-group-name" class="font-bold text-base md:text-lg text-center bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none w-full" readonly>
                     <button id="btn-save-group-name" class="hidden text-blue-600 text-sm font-bold">Lưu</button>
                 </div>
                 
-                <button id="btn-copy-link" class="mt-4 flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-full text-sm font-medium transition">
+                <button id="btn-copy-link" class="mt-4 flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-full text-xs md:text-sm font-medium transition">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
                     Copy Link Mời
                 </button>
             </div>
 
-            <div class="p-4 bg-slate-50 border-b">
-                <h4 class="text-xs font-bold text-slate-500 uppercase">Thành viên (<span id="member-count">0</span>)</h4>
+            <div class="p-3 md:p-4 bg-slate-50 border-b">
+                <h4 class="text-[10px] md:text-xs font-bold text-slate-500 uppercase">Thành viên (<span id="member-count">0</span>)</h4>
             </div>
             
             <div id="drawer-member-list" class="flex-1 overflow-y-auto p-2 space-y-1"></div>
 
             <div id="drawer-admin-actions" class="p-4 border-t hidden">
-                <button id="btn-delete-group" class="hidden w-full py-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white rounded-lg font-bold transition">Xóa Nhóm Này</button>
-                <button id="btn-leave-group" class="hidden w-full py-2 bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200 hover:text-slate-800 rounded-lg font-bold transition">Rời Nhóm</button>
+                <button id="btn-delete-group" class="hidden w-full py-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white rounded-lg font-bold transition text-sm">Xóa Nhóm Này</button>
+                <button id="btn-leave-group" class="hidden w-full py-2 bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200 hover:text-slate-800 rounded-lg font-bold transition text-sm">Rời Nhóm</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL TẠO NHÓM -->
-    <div id="create-room-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm transition-opacity">
+    <div id="create-room-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm px-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
             <div class="flex justify-between items-center mb-5">
                 <h2 class="text-xl font-bold text-slate-800">Tạo Nhóm Mới</h2>
-                <button id="close-create-room" class="text-slate-400 hover:text-red-500">✖</button>
+                <button id="close-create-room" class="text-slate-400 hover:text-red-500 text-xl font-bold">✖</button>
             </div>
             
             <div class="flex flex-col items-center mb-5">
                 <label for="room-avatar-upload" class="cursor-pointer relative group">
-                    <div id="room-avatar-preview" class="w-20 h-20 rounded-full bg-slate-200 border-2 border-dashed border-slate-400 flex items-center justify-center overflow-hidden">
+                    <div id="room-avatar-preview" class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-slate-200 border-2 border-dashed border-slate-400 flex items-center justify-center overflow-hidden">
                         <span class="text-slate-500 text-sm">Ảnh</span>
                     </div>
                     <div class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -136,8 +142,8 @@
             </div>
 
             <div class="flex gap-4 mb-4">
-                <button id="btn-public" class="flex-1 py-2 rounded-lg font-medium border-2 border-blue-600 bg-blue-50 text-blue-600 transition">Công Khai</button>
-                <button id="btn-private" class="flex-1 py-2 rounded-lg font-medium border-2 border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50">Bảo Mật</button>
+                <button id="btn-public" class="flex-1 py-2 rounded-lg font-medium border-2 border-blue-600 bg-blue-50 text-blue-600 transition text-sm md:text-base">Công Khai</button>
+                <button id="btn-private" class="flex-1 py-2 rounded-lg font-medium border-2 border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 text-sm md:text-base">Bảo Mật</button>
             </div>
 
             <div id="room-password-container" class="hidden mb-5">
@@ -149,11 +155,10 @@
         </div>
     </div>
 
-    <!-- MODAL VÀO NHÓM BẢO MẬT -->
-    <div id="join-room-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm">
+    <div id="join-room-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm px-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h2 class="text-xl font-bold text-slate-800 mb-2">Tham gia Nhóm Bảo Mật</h2>
-            <p class="text-sm text-slate-500 mb-5">Vui lòng nhập thông tin để tham gia.</p>
+            <h2 class="text-lg md:text-xl font-bold text-slate-800 mb-2">Tham gia Nhóm Bảo Mật</h2>
+            <p class="text-xs md:text-sm text-slate-500 mb-5">Vui lòng nhập thông tin để tham gia.</p>
             
             <div class="mb-5">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Mật khẩu nhóm</label>
@@ -161,18 +166,17 @@
             </div>
             
             <div class="flex gap-3">
-                <button id="cancel-join-room" class="flex-1 py-2 rounded-lg font-medium border border-slate-300 text-slate-600 hover:bg-slate-50 transition">Hủy</button>
-                <button id="confirm-join-room" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition">Vào nhóm</button>
+                <button id="cancel-join-room" class="flex-1 py-2 rounded-lg font-medium border border-slate-300 text-slate-600 hover:bg-slate-50 transition text-sm md:text-base">Hủy</button>
+                <button id="confirm-join-room" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition text-sm md:text-base">Vào nhóm</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL MỜI THAM GIA QUA LINK -->
-    <div id="invite-link-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center backdrop-blur-md">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center transform scale-95 transition-transform duration-300">
-            <div id="invite-avatar" class="w-24 h-24 mx-auto rounded-full bg-slate-200 mb-4 border-4 border-blue-100 flex items-center justify-center overflow-hidden shadow-lg"></div>
-            <h2 class="text-2xl font-extrabold text-slate-800 mb-1" id="invite-room-name">Tên Nhóm</h2>
-            <p class="text-sm text-slate-500 mb-8">Mời bạn tham gia vào nhóm chat này</p>
+    <div id="invite-link-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center backdrop-blur-md px-4">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 md:p-8 text-center transform scale-95 transition-transform duration-300">
+            <div id="invite-avatar" class="w-20 h-20 md:w-24 md:h-24 mx-auto rounded-full bg-slate-200 mb-4 border-4 border-blue-100 flex items-center justify-center overflow-hidden shadow-lg"></div>
+            <h2 class="text-xl md:text-2xl font-extrabold text-slate-800 mb-1" id="invite-room-name">Tên Nhóm</h2>
+            <p class="text-xs md:text-sm text-slate-500 mb-6 md:mb-8">Mời bạn tham gia vào nhóm chat này</p>
             
             <div id="invite-password-area" class="hidden mb-6 text-left">
                 <label class="block text-sm font-bold text-slate-700 mb-1">Nhóm này cần mật khẩu:</label>
@@ -186,17 +190,16 @@
         </div>
     </div>
 
-    <!-- MODAL CÀI ĐẶT NGƯỜI DÙNG -->
-    <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm transition-opacity">
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm px-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 transform transition-all">
             <div class="flex justify-between items-center mb-5">
-                <h2 class="text-xl font-bold text-slate-800">Cài Đặt Tài Khoản</h2>
-                <button id="close-settings-modal" class="text-slate-400 hover:text-red-500 text-lg font-bold">✖</button>
+                <h2 class="text-lg md:text-xl font-bold text-slate-800">Cài Đặt Tài Khoản</h2>
+                <button id="close-settings-modal" class="text-slate-400 hover:text-red-500 text-xl font-bold">✖</button>
             </div>
             
             <div class="flex flex-col items-center mb-5">
                 <label for="settings-avatar-upload" class="cursor-pointer relative group">
-                    <div id="settings-avatar-preview" class="w-24 h-24 rounded-full bg-slate-200 border-2 border-slate-300 flex items-center justify-center overflow-hidden">
+                    <div id="settings-avatar-preview" class="w-20 h-20 md:w-24 md:h-24 rounded-full bg-slate-200 border-2 border-slate-300 flex items-center justify-center overflow-hidden">
                         <span class="text-slate-500 text-3xl font-bold">U</span>
                     </div>
                     <div class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
