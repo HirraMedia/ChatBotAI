@@ -276,9 +276,7 @@ function loadRooms() {
             const room = childSnapshot.val();
             const roomId = childSnapshot.key;
             
-            // Chỉ hiển thị phòng nếu là Public, hoặc Private nhưng mình có trong members
-            const isMember = currentUser && room.members && room.members[currentUser.uid];
-            if (room.type === 'private' && !isMember) return; 
+            // XÓA ĐIỀU KIỆN ẨN NHÓM ĐỂ AI CŨNG THẤY ĐƯỢC NHÓM
             
             const btn = document.createElement('div');
             btn.className = "group flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 cursor-pointer transition-all border border-transparent";
@@ -286,7 +284,7 @@ function loadRooms() {
             let avatarHtml = room.avatar ? `<img src="${room.avatar}" class="w-full h-full object-cover">` : `#`;
             let lockIcon = room.type === 'private' ? `<span class="text-xs text-slate-400">🔒</span>` : '';
 
-            // Thêm nút X (btn-delete-room-super) ẩn đi, chỉ hiện khi hover chuột (group-hover:flex)
+            // Nút X (btn-delete-room-super)
             btn.innerHTML = `
                 <div class="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold overflow-hidden">${avatarHtml}</div>
                 <h3 class="font-medium text-sm text-slate-300 group-hover:text-white flex-1 truncate">${room.name}</h3>
@@ -296,35 +294,26 @@ function loadRooms() {
                 </div>
             `;
             
-            // Bắt sự kiện khi click vào dòng nhóm để tham gia
             btn.addEventListener('click', (e) => {
-                // Bỏ qua nếu người dùng đang bấm vào nút X
                 if (e.target.closest('.btn-delete-room-super')) return;
                 handleJoinRoomReq(roomId, room);
             });
 
-            // LOGIC QUYỀN TỐI CAO: Xử lý khi bấm nút X
+            // LOGIC QUYỀN TỐI CAO
             const deleteBtn = btn.querySelector('.btn-delete-room-super');
             deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Ngăn việc click bị lẫn sang lệnh vào nhóm
-                
-                // Hiển thị bảng nhập mật khẩu
+                e.stopPropagation(); 
                 const pass = prompt("🔐 YÊU CẦU QUYỀN TỐI CAO:\nNhập mật khẩu cấp cao nhất để xóa nhóm:");
-                
                 if (pass === "10101010") {
                     if (confirm(`Bạn có chắc chắn muốn XÓA VĨNH VIỄN nhóm "${room.name}" không?`)) {
-                        // Xóa dữ liệu phòng và tin nhắn trên Firebase
                         remove(ref(db, `rooms/${roomId}`));
                         remove(ref(db, `group_messages/${roomId}`));
                         alert("✅ Đã xóa nhóm thành công!");
-                        
-                        // Nếu đang ở trong chính nhóm bị xóa thì đẩy ra ngoài Chat riêng tư
                         if (currentRoomId === roomId) {
                             openPrivateChat();
                         }
                     }
                 } else if (pass !== null) {
-                    // Nếu nhập sai mật khẩu (và không bấm Hủy)
                     alert("❌ Mật khẩu cấp cao không chính xác!");
                 }
             });
