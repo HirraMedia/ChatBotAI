@@ -2,13 +2,10 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     scroll-behavior: smooth;
-    /* Dùng 100dvh thay vì 100vh để fix lỗi thanh địa chỉ trình duyệt điện thoại */
-    height: 100dvh; 
-    width: 100vw;
-    overflow: hidden;
+    /* Đã xóa overflow: hidden ở đây để trang chủ cuộn bình thường */
 }
 
-/* Fix lỗi lẹm tai thỏ khi xoay màn hình ngang (Landscape Mode) */
+/* Fix lỗi lẹm tai thỏ khi xoay màn hình ngang (Landscape Mode) trên điện thoại */
 @supports (padding: max(0px)) {
     body {
         padding-left: env(safe-area-inset-left);
