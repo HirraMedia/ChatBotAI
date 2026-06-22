@@ -2,6 +2,18 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     scroll-behavior: smooth;
+    /* Dùng 100dvh thay vì 100vh để fix lỗi thanh địa chỉ trình duyệt điện thoại */
+    height: 100dvh; 
+    width: 100vw;
+    overflow: hidden;
+}
+
+/* Fix lỗi lẹm tai thỏ khi xoay màn hình ngang (Landscape Mode) */
+@supports (padding: max(0px)) {
+    body {
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
 }
 
 .gradient-text {
@@ -27,16 +39,14 @@ body {
 }
 
 /* --- BONG BÓNG CHAT CỦA ROBOT --- */
-/* Bong bóng chat phong cách Glassmorphism nền tối */
 .speech-bubble-dark {
     position: relative;
 }
 
-/* Tạo đuôi tam giác chỉ lên Robot (Màu đồng bộ với viền neon) */
 .speech-bubble-dark:after {
     content: '';
     position: absolute;
-    top: -10px; /* Đẩy tam giác lên viền trên */
+    top: -10px;
     left: 50%;
     transform: translateX(-50%);
     border-width: 0 10px 10px 10px;
