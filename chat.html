@@ -11,12 +11,16 @@
 </head>
 <body class="bg-slate-100 flex h-screen overflow-hidden">
 
+    <!-- SIDEBAR TRÁI -->
     <aside class="w-72 bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300 z-30 shadow-2xl flex-shrink-0">
         <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-            <h1 class="text-xl font-bold gradient-text">SQL_AI_Hub</h1>
-            <button id="auth-action-btn" class="text-sm font-medium px-3 py-1 rounded-full border transition" title="Tài khoản">
-                </button>
-        </div>
+    <h1 class="text-xl font-bold gradient-text">SQL_AI_Hub</h1>
+    <!-- Nút Tài khoản gộp Bánh răng (Đã fix lỗi rớt dòng) -->
+    <button id="auth-action-btn" class="flex flex-shrink-0 items-center justify-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border border-blue-500 text-blue-400 hover:bg-blue-600 hover:text-white transition cursor-pointer whitespace-nowrap" title="Cài đặt tài khoản">
+        <span id="auth-btn-text">Đăng nhập</span>
+        <svg id="auth-gear-icon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+    </button>
+</div>
         
         <div class="p-4 border-b border-slate-800">
             <div id="btn-private-chat" class="group flex items-center gap-3 p-3 rounded-lg bg-blue-600 cursor-pointer shadow-lg shadow-blue-500/20 transition-all">
@@ -29,7 +33,7 @@
         </div>
 
         <div class="px-4 pt-4">
-            <button id="btn-create-room" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition border border-slate-700">
+            <button id="btn-open-create-room" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition border border-slate-700">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                 Tạo nhóm mới <span class="text-[10px] text-slate-400 font-normal">(Cần ĐN)</span>
             </button>
@@ -37,304 +41,188 @@
 
         <div class="flex-1 overflow-y-auto px-3 pb-4 space-y-1 mt-4" id="room-list">
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">Cộng đồng (Nhóm chung)</p>
-            </div>
+        </div>
     </aside>
 
-    <div class="hidden lg:flex lg:w-1/4 bg-slate-800 items-center justify-center relative shadow-2xl z-20 border-r border-slate-700">
-        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#38bdf8_1px,transparent_1px)] [background-size:20px_20px]"></div>
-        <div class="relative w-full max-w-sm mx-auto p-4 flex flex-col items-center justify-center">
-            <div class="robot-float" id="robot-container">
-                <svg id="robot-svg" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="w-48 h-48 drop-shadow-[0_0_15px_rgba(56,189,248,0.3)] transition-all duration-300">
-                    <circle cx="100" cy="100" r="80" fill="#1e293b" opacity="0.5"/>
-                    <path fill="#e0f2fe" d="M44.7,-76.4C58.8,-69.2,71.8,-59.1,81.4,-46.3C91,-33.5,97.2,-18.1,96.3,-2.8C95.4,12.5,87.4,27.9,76.5,40.1C65.6,52.3,51.8,61.4,36.9,68.9C22,76.4,6,82.4,-8.6,81.2C-23.2,80,-36.5,71.6,-48.9,62.1C-61.3,52.6,-72.8,42,-80.6,28.6C-88.4,15.2,-92.5,-0.9,-88.7,-15.5C-84.9,-30.1,-73.2,-43.2,-59.6,-51.9C-46,-60.6,-30.5,-64.9,-16.1,-71.4C-1.7,-77.9,11.6,-86.6,26.4,-84.9C41.2,-83.2,57.5,-71.1,44.7,-76.4Z" transform="translate(100 100) scale(1)" />
-                    <rect x="60" y="55" width="80" height="65" rx="30" fill="#ffffff" stroke="#0284c7" stroke-width="4"/>
-                    <rect x="55" y="70" width="90" height="28" rx="12" fill="#0f172a"/>
-                    <circle cx="80" cy="84" r="6" fill="#38bdf8" class="robot-eye drop-shadow-[0_0_8px_#38bdf8]"/>
-                    <circle cx="120" cy="84" r="6" fill="#38bdf8" class="robot-eye drop-shadow-[0_0_8px_#38bdf8]"/>
-                    <line x1="100" y1="55" x2="100" y2="25" stroke="#0284c7" stroke-width="4"/>
-                    <circle cx="100" cy="20" r="8" fill="#f59e0b" class="robot-antenna transition-colors duration-300"/>
-                    <path d="M 85 120 L 115 120 L 120 145 L 80 145 Z" fill="#ffffff" stroke="#0284c7" stroke-width="4"/>
-                </svg>
-            </div>
-            <div id="robot-bubble" class="speech-bubble-dark p-3 text-sm text-white font-medium mt-6 opacity-0 transition-opacity duration-300 w-56 text-center shadow-[0_0_15px_rgba(56,189,248,0.3)] border border-sky-400 bg-slate-800/90 backdrop-blur-sm rounded-xl z-10">
-                Sẵn sàng giải SQL!
-            </div>
-        </div>
-    </div>
-
-    <div class="flex-1 h-full flex flex-col bg-slate-50 relative z-10">
-        <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm">
+    <!-- KHU VỰC CHAT CHÍNH -->
+    <div class="flex-1 h-full flex flex-col bg-slate-50 relative z-10 w-full overflow-hidden">
+        <div class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center shadow-sm z-20">
             <div>
                 <h2 id="room-title" class="font-bold text-lg text-slate-800 flex items-center gap-2">
                     <span id="room-icon">🤖</span> Khu Vực Hỏi Đáp Riêng
                 </h2>
                 <p id="user-email-display" class="text-xs text-slate-500 font-medium">Đang tải...</p>
             </div>
+            <!-- Nút mở Tùy chọn nhóm -->
+            <button id="btn-group-options" class="hidden p-2 text-slate-500 hover:bg-slate-100 rounded-full transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+            </button>
         </div>
         
         <div id="chat-box" class="flex-1 overflow-y-auto p-6 space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-slate-50">
             <div class="text-center text-slate-400 mt-10">Đang tải dữ liệu...</div>
         </div>
 
-        <div class="p-4 bg-white border-t border-slate-200">
-            <div class="relative flex items-center max-w-4xl mx-auto">
-                <input type="text" id="user-input" placeholder="Nhập câu hỏi hoặc code SQL..." class="w-full bg-slate-100 border border-slate-300 text-slate-800 rounded-2xl pl-6 pr-14 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <div class="p-4 bg-white border-t border-slate-200 z-20">
+            <div class="relative flex items-center max-w-5xl mx-auto">
+                <input type="text" id="user-input" placeholder="Nhập câu hỏi... (Tag @bot để gọi AI trong nhóm)" class="w-full bg-slate-100 border border-slate-300 text-slate-800 rounded-2xl pl-6 pr-14 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <button id="send-btn" class="absolute right-3 bg-blue-600 hover:bg-blue-700 text-white w-10 h-10 rounded-xl flex items-center justify-center transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
                 </button>
             </div>
         </div>
+
+        <!-- NGĂN KÉO TÙY CHỌN NHÓM (DRAWER PHẢI) -->
+        <div id="group-drawer" class="absolute right-0 top-0 h-full w-80 bg-white border-l border-slate-200 shadow-2xl transform translate-x-full transition-transform duration-300 z-30 flex flex-col">
+            <div class="p-4 border-b flex justify-between items-center bg-slate-50">
+                <h3 class="font-bold text-slate-800">Thông tin nhóm</h3>
+                <button id="close-drawer-btn" class="text-slate-400 hover:text-red-500 font-bold">✖</button>
+            </div>
+            
+            <div class="p-5 flex flex-col items-center border-b">
+                <label for="edit-group-avatar" class="cursor-pointer relative group mb-3">
+                    <div id="drawer-group-avatar" class="w-20 h-20 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden border-2 border-slate-300">
+                        <!-- Chứa ảnh nhóm -->
+                    </div>
+                    <div id="edit-avatar-overlay" class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hidden">
+                        <span class="text-white text-xs">Đổi</span>
+                    </div>
+                </label>
+                <input type="file" id="edit-group-avatar" accept="image/*" class="hidden">
+                
+                <div class="flex items-center gap-2 w-full">
+                    <input type="text" id="drawer-group-name" class="font-bold text-lg text-center bg-transparent border-b border-transparent focus:border-blue-500 focus:outline-none w-full" readonly>
+                    <button id="btn-save-group-name" class="hidden text-blue-600 text-sm font-bold">Lưu</button>
+                </div>
+                
+                <button id="btn-copy-link" class="mt-4 flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-full text-sm font-medium transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                    Copy Link Mời
+                </button>
+            </div>
+
+            <div class="p-4 bg-slate-50 border-b">
+                <h4 class="text-xs font-bold text-slate-500 uppercase">Thành viên (<span id="member-count">0</span>)</h4>
+            </div>
+            
+            <div id="drawer-member-list" class="flex-1 overflow-y-auto p-2 space-y-1">
+                <!-- Danh sách thành viên render tại đây -->
+            </div>
+
+            <div id="drawer-admin-actions" class="p-4 border-t hidden">
+                <button id="btn-delete-group" class="w-full py-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-600 hover:text-white rounded-lg font-bold transition">Xóa Nhóm Này</button>
+            </div>
+        </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
-        import { getDatabase, ref, push, onChildAdded, onValue, off } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
-
-        // =====================================
-        const GROQ_API_KEY = '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';
-        const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-
-        // 2. CẤU HÌNH FIREBASE
-        const firebaseConfig = {
-            apiKey: "AIzaSyBWvxVVnoOEoK7DlkvH4GMy2TZ5UyItn5A",
-            authDomain: "chatbotairooms.firebaseapp.com",
-            databaseURL: "https://chatbotairooms-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "chatbotairooms",
-            storageBucket: "chatbotairooms.firebasestorage.app",
-            messagingSenderId: "234528451358",
-            appId: "1:234528451358:web:25c0057f6d6b6545a4770f"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getDatabase(app);
-
-        let currentUser = null;
-        let currentMode = 'private'; // 'private' hoặc 'group'
-        let currentRoomId = null;
-        let currentChatListener = null; 
-
-        // Bộ nhớ tạm thời cho Chat Riêng Tư (F5 là mất)
-        let sessionHistory = [{ role: "system", content: "Bạn là AI giải bài tập SQL. Trả lời bằng tiếng Việt, chuyên môn SQL." }];
-
-        let guestUid = localStorage.getItem('guestUid');
-        if (!guestUid) {
-            guestUid = 'guest_' + Date.now() + Math.random().toString(36).substring(7);
-            localStorage.setItem('guestUid', guestUid);
-        }
-
-        const authBtn = document.getElementById('auth-action-btn');
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                currentUser = user;
-                document.getElementById('user-email-display').innerText = "Tài khoản: " + user.email;
-                authBtn.innerText = "Đăng xuất";
-                authBtn.className = "text-xs font-medium px-4 py-1.5 rounded-full border border-red-500 text-red-400 hover:bg-red-500 hover:text-white transition cursor-pointer";
-            } else {
-                currentUser = null;
-                document.getElementById('user-email-display').innerText = "Trạng thái: Khách (Chưa đăng nhập)";
-                authBtn.innerText = "Đăng nhập";
-                authBtn.className = "text-xs font-medium px-4 py-1.5 rounded-full border border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-white transition cursor-pointer";
-            }
+    <!-- MODAL TẠO NHÓM -->
+    <div id="create-room-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-xl font-bold text-slate-800">Tạo Nhóm Mới</h2>
+                <button id="close-create-room" class="text-slate-400 hover:text-red-500">✖</button>
+            </div>
             
-            loadRooms(); 
-            openPrivateChat(); 
-        });
+            <div class="flex flex-col items-center mb-5">
+                <label for="room-avatar-upload" class="cursor-pointer relative group">
+                    <div id="room-avatar-preview" class="w-20 h-20 rounded-full bg-slate-200 border-2 border-dashed border-slate-400 flex items-center justify-center overflow-hidden">
+                        <span class="text-slate-500 text-sm">Ảnh</span>
+                    </div>
+                    <div class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span class="text-white text-xs">Tải lên</span>
+                    </div>
+                </label>
+                <input type="file" id="room-avatar-upload" accept="image/*" class="hidden">
+            </div>
 
-        authBtn.addEventListener('click', () => {
-            if (currentUser) {
-                signOut(auth); 
-            } else {
-                window.location.href = 'auth.html'; 
-            }
-        });
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Tên nhóm</label>
+                <input type="text" id="room-name-input" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Nhập tên nhóm...">
+            </div>
 
-        document.getElementById('btn-private-chat').addEventListener('click', openPrivateChat);
+            <div class="flex gap-4 mb-4">
+                <button id="btn-public" class="flex-1 py-2 rounded-lg font-medium border-2 border-blue-600 bg-blue-50 text-blue-600 transition">Công Khai</button>
+                <button id="btn-private" class="flex-1 py-2 rounded-lg font-medium border-2 border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50">Bảo Mật</button>
+            </div>
 
-        // --- SỬA LẠI HÀM NÀY: KHÔNG TẢI FIREBASE NỮA ---
-        function openPrivateChat() {
-            currentMode = 'private';
-            currentRoomId = null;
+            <div id="room-password-container" class="hidden mb-5">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Mật khẩu nhóm</label>
+                <input type="password" id="room-password-input" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Tạo mật khẩu...">
+            </div>
 
-            document.getElementById('btn-private-chat').classList.replace('bg-slate-800', 'bg-blue-600');
-            document.getElementById('room-title').innerHTML = `<span id="room-icon">🤖</span> Hỏi Đáp Riêng Tư <span class="text-xs text-red-400 ml-2">(Chế độ ẩn danh)</span>`;
-            document.getElementById('user-input').placeholder = "Hỏi AI bài tập SQL (Tin nhắn không bị lưu)...";
+            <button id="confirm-create-room" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition">Tạo Nhóm Xong</button>
+        </div>
+    </div>
 
-            if (currentChatListener) off(currentChatListener);
-            document.getElementById('chat-box').innerHTML = ''; // Xóa sạch màn hình
-
-            // Reset lại bộ nhớ của AI mỗi lần bấm vào tab này
-            sessionHistory = [{ role: "system", content: "Bạn là AI giải bài tập SQL. Trả lời bằng tiếng Việt, chuyên môn SQL." }];
+    <!-- MODAL VÀO NHÓM BẢO MẬT (Thường) -->
+    <div id="join-room-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h2 class="text-xl font-bold text-slate-800 mb-2">Tham gia Nhóm Bảo Mật</h2>
+            <p class="text-sm text-slate-500 mb-5">Vui lòng nhập thông tin để tham gia.</p>
             
-            // Render trực tiếp lời chào (Không qua Database)
-            renderMessage('ai', 'Chào bạn! Chế độ ẩn danh đã bật, tin nhắn của bạn sẽ không bị lưu lại. Gửi bài tập SQL cho mình nhé!', 'Trợ lý AI');
-        }
-
-        document.getElementById('btn-create-room').addEventListener('click', () => {
-            if (!currentUser) {
-                alert("Bạn phải Đăng nhập hoặc Đăng ký để tạo nhóm chat chung!");
-                window.location.href = 'auth.html';
-                return;
-            }
-            const roomName = prompt("Nhập tên nhóm chat mới (Mọi người đều sẽ thấy nhóm này):");
-            if (roomName && roomName.trim() !== "") {
-                push(ref(db, 'rooms'), { name: roomName.trim(), timestamp: Date.now() });
-            }
-        });
-
-        function loadRooms() {
-            const roomListDiv = document.getElementById('room-list');
-            onValue(ref(db, 'rooms'), (snapshot) => {
-                roomListDiv.innerHTML = '<p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">Cộng đồng (Nhóm chung)</p>';
-                snapshot.forEach((childSnapshot) => {
-                    const room = childSnapshot.val();
-                    const roomId = childSnapshot.key;
-                    
-                    const btn = document.createElement('div');
-                    btn.className = "group flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 cursor-pointer transition-all border border-transparent";
-                    btn.innerHTML = `
-                        <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 font-bold group-hover:bg-blue-600 group-hover:text-white transition">#</div>
-                        <h3 class="font-medium text-sm text-slate-300 group-hover:text-white">${room.name}</h3>
-                    `;
-                    
-                    btn.addEventListener('click', () => joinRoom(roomId, room.name));
-                    roomListDiv.appendChild(btn);
-                });
-            });
-        }
-
-        function joinRoom(roomId, roomName) {
-            if (!currentUser) {
-                alert("Bạn phải Đăng nhập hoặc Đăng ký để tham gia nhóm chat này!");
-                window.location.href = 'auth.html';
-                return;
-            }
-
-            currentMode = 'group';
-            currentRoomId = roomId;
-
-            document.getElementById('btn-private-chat').classList.replace('bg-blue-600', 'bg-slate-800');
-            document.getElementById('room-title').innerHTML = `<span id="room-icon">🌍</span> Nhóm: ${roomName}`;
-            document.getElementById('user-input').placeholder = "Nhắn tin với nhóm hoặc yêu cầu AI...";
-
-            if (currentChatListener) off(currentChatListener);
-            document.getElementById('chat-box').innerHTML = '';
-
-            const chatRef = ref(db, `group_messages/${roomId}`);
-            currentChatListener = chatRef;
-
-            onChildAdded(chatRef, (snapshot) => {
-                const msg = snapshot.val();
-                renderMessage(msg.sender, msg.text, msg.email);
-            });
-        }
-
-        const userInput = document.getElementById('user-input');
-        const sendBtn = document.getElementById('send-btn');
-
-        sendBtn.addEventListener('click', handleSend);
-        userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
-
-        // --- SỬA LẠI HÀM GỬI: PHÂN TÁCH LƯU DB VÀ KHÔNG LƯU DB ---
-        async function handleSend() {
-            const text = userInput.value.trim();
-            if (!text) return;
-            userInput.value = '';
-
-            const senderEmail = currentUser ? currentUser.email : "Khách";
+            <div class="mb-5">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Mật khẩu nhóm</label>
+                <input type="password" id="join-password" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Nhập mật khẩu...">
+            </div>
             
-            // Xử lý gửi tin nhắn của User
-            if (currentMode === 'private') {
-                // Chỉ hiển thị UI và lưu vào RAM, KHÔNG PUSH Firebase
-                renderMessage('user', text, senderEmail);
-                sessionHistory.push({ role: "user", content: text });
-            } else {
-                // Nhóm chung: Phải PUSH Firebase để đồng bộ cho mọi người
-                const dbPath = `group_messages/${currentRoomId}`;
-                push(ref(db, dbPath), { sender: 'user', text: text, email: senderEmail, timestamp: Date.now() });
-            }
+            <div class="flex gap-3">
+                <button id="cancel-join-room" class="flex-1 py-2 rounded-lg font-medium border border-slate-300 text-slate-600 hover:bg-slate-50 transition">Hủy</button>
+                <button id="confirm-join-room" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition">Vào nhóm</button>
+            </div>
+        </div>
+    </div>
 
-            document.getElementById('robot-svg').classList.add('robot-thinking');
-            document.getElementById('robot-bubble').innerText = "Đang tra cứu dữ liệu...";
-            document.getElementById('robot-bubble').style.opacity = 1;
-
-            try {
-                // Lấy mảng tin nhắn để gửi cho AI
-                let apiMessages = [];
-                if (currentMode === 'private') {
-                    apiMessages = sessionHistory; // Có nhớ ngữ cảnh
-                } else {
-                    // Chat nhóm chỉ gửi câu hiện tại để tránh tốn token
-                    apiMessages = [{ role: "user", content: `(Trả lời bằng tiếng Việt, chuyên môn SQL) ${text}` }];
-                }
-
-                const response = await fetch(GROQ_API_URL, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        model: "llama-3.1-8b-instant",
-                        messages: apiMessages
-                    })
-                });
-
-                const data = await response.json();
-                document.getElementById('robot-svg').classList.remove('robot-thinking');
-                setTimeout(() => { document.getElementById('robot-bubble').style.opacity = 0; }, 3000);
-
-                if (data.choices && data.choices.length > 0) {
-                    const aiReply = data.choices[0].message.content;
-                    
-                    if (currentMode === 'private') {
-                        // Chỉ hiển thị UI và lưu RAM, KHÔNG PUSH Firebase
-                        renderMessage('ai', aiReply, 'Trợ lý AI');
-                        sessionHistory.push({ role: "assistant", content: aiReply });
-                    } else {
-                        // Nhóm chung: PUSH Firebase AI reply
-                        const dbPath = `group_messages/${currentRoomId}`;
-                        push(ref(db, dbPath), { sender: 'ai', text: aiReply, email: 'Trợ lý AI', timestamp: Date.now() });
-                    }
-                }
-            } catch (error) {
-                document.getElementById('robot-svg').classList.remove('robot-thinking');
-                if(currentMode === 'private') renderMessage('ai', "Lỗi kết nối API rồi bạn ơi!", 'Trợ lý AI');
-            }
-        }
-
-        function renderMessage(sender, text, email) {
-            const chatBox = document.getElementById('chat-box');
-            const msgDiv = document.createElement('div');
+    <!-- MODAL MỜI THAM GIA QUA LINK -->
+    <div id="invite-link-modal" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center backdrop-blur-md">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center transform scale-95 transition-transform duration-300">
+            <div id="invite-avatar" class="w-24 h-24 mx-auto rounded-full bg-slate-200 mb-4 border-4 border-blue-100 flex items-center justify-center overflow-hidden shadow-lg"></div>
+            <h2 class="text-2xl font-extrabold text-slate-800 mb-1" id="invite-room-name">Tên Nhóm</h2>
+            <p class="text-sm text-slate-500 mb-8">Mời bạn tham gia vào nhóm chat này</p>
             
-            const currentEmail = currentUser ? currentUser.email : "Khách";
-            const isMe = (sender === 'user' && email === currentEmail);
-            const isAi = (sender === 'ai');
+            <div id="invite-password-area" class="hidden mb-6 text-left">
+                <label class="block text-sm font-bold text-slate-700 mb-1">Nhóm này cần mật khẩu:</label>
+                <input type="password" id="invite-password" class="w-full border border-slate-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nhập mật khẩu nhóm...">
+            </div>
 
-            msgDiv.className = `flex flex-col mb-4 ${isMe ? 'items-end' : 'items-start'}`;
+            <div class="flex flex-col gap-3">
+                <button id="btn-accept-invite" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow-md">Tham Gia Nhóm</button>
+                <button id="btn-decline-invite" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-3 rounded-xl transition">Từ Chối</button>
+            </div>
+        </div>
+    </div>
 
-            const nameLabel = document.createElement('span');
-            nameLabel.className = "text-xs text-slate-400 mb-1 px-1 font-medium";
-            nameLabel.innerText = isMe ? "Bạn" : (isAi ? "🤖 Robot AI" : email);
-            msgDiv.appendChild(nameLabel);
+    <!-- MODAL CÀI ĐẶT NGƯỜI DÙNG -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 transform transition-all">
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-xl font-bold text-slate-800">Cài Đặt Tài Khoản</h2>
+                <button id="close-settings-modal" class="text-slate-400 hover:text-red-500 text-lg font-bold">✖</button>
+            </div>
+            
+            <div class="flex flex-col items-center mb-5">
+                <label for="settings-avatar-upload" class="cursor-pointer relative group">
+                    <div id="settings-avatar-preview" class="w-24 h-24 rounded-full bg-slate-200 border-2 border-slate-300 flex items-center justify-center overflow-hidden">
+                        <span class="text-slate-500 text-3xl font-bold">U</span>
+                    </div>
+                    <div class="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span class="text-white text-xs font-medium">Đổi Ảnh</span>
+                    </div>
+                </label>
+                <input type="file" id="settings-avatar-upload" accept="image/*" class="hidden">
+            </div>
 
-            const contentBox = document.createElement('div');
-            if (isMe) {
-                contentBox.className = "p-3 px-5 rounded-2xl bg-blue-600 text-white rounded-tr-sm max-w-[85%] shadow-md msg-content";
-            } else if (isAi) {
-                contentBox.className = "p-4 rounded-2xl bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-sm max-w-[90%] shadow-lg msg-content";
-            } else {
-                contentBox.className = "p-3 px-5 rounded-2xl bg-white text-slate-800 border border-slate-200 rounded-tl-sm max-w-[85%] shadow-sm msg-content";
-            }
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Tên hiển thị</label>
+                <input type="text" id="settings-name-input" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Nhập tên của bạn...">
+            </div>
 
-            if (typeof marked !== 'undefined') {
-                contentBox.innerHTML = marked.parse(text);
-            } else {
-                contentBox.innerHTML = text.replace(/\n/g, '<br>');
-            }
+            <div class="flex flex-col gap-3">
+                <button id="save-settings-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition shadow-md">Lưu Thay Đổi</button>
+                <button id="logout-settings-btn" class="w-full border border-red-500 text-red-500 hover:bg-red-500 hover:text-white font-bold py-2 rounded-lg transition">Đăng Xuất</button>
+            </div>
+        </div>
+    </div>
 
-            msgDiv.appendChild(contentBox);
-            chatBox.appendChild(msgDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-    </script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>
