@@ -30,6 +30,28 @@ let userAvatarStr = localStorage.getItem('userAvatar') || null;
 let botAvatarStr = localStorage.getItem('botAvatar') || null;
 
 /* ==========================================
+   LOGIC GIAO DIỆN MENU MOBILE
+========================================== */
+const mainSidebar = document.getElementById('main-sidebar');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
+const btnOpenSidebar = document.getElementById('btn-open-sidebar');
+const btnCloseSidebar = document.getElementById('btn-close-sidebar');
+
+window.openSidebarMobile = function() {
+    if(mainSidebar) mainSidebar.classList.remove('-translate-x-full');
+    if(sidebarOverlay) sidebarOverlay.classList.remove('hidden');
+}
+
+window.closeSidebarMobile = function() {
+    if(mainSidebar) mainSidebar.classList.add('-translate-x-full');
+    if(sidebarOverlay) sidebarOverlay.classList.add('hidden');
+}
+
+if (btnOpenSidebar) btnOpenSidebar.addEventListener('click', openSidebarMobile);
+if (btnCloseSidebar) btnCloseSidebar.addEventListener('click', closeSidebarMobile);
+if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebarMobile);
+
+/* ==========================================
    QUẢN LÝ TÀI KHOẢN & KHỞI ĐỘNG
 ========================================== */
 const authBtn = document.getElementById('auth-action-btn');
@@ -39,7 +61,6 @@ const authGearIcon = document.getElementById('auth-gear-icon');
 onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
-        
         const userRef = ref(db, `users/${user.uid}`);
         const userSnap = await get(userRef);
         if (userSnap.exists() && userSnap.val().avatar) {
@@ -48,36 +69,44 @@ onAuthStateChanged(auth, async (user) => {
         }
 
         const displayName = user.displayName || user.email;
-        document.getElementById('user-email-display').innerText = "Tài khoản: " + displayName;
+        if(document.getElementById('user-email-display')) document.getElementById('user-email-display').innerText = "Tài khoản: " + displayName;
         
-        authBtnText.innerText = "Tài khoản";
-        authGearIcon.classList.remove('hidden');
+        if(authBtnText) authBtnText.innerText = "Tài khoản";
+        if(authGearIcon) authGearIcon.classList.remove('hidden');
         
         await checkInviteLink();
     } else {
         currentUser = null;
-        document.getElementById('user-email-display').innerText = "Trạng thái: Khách (Chưa đăng nhập)";
-        authBtnText.innerText = "Đăng nhập";
-        authGearIcon.classList.add('hidden'); 
+        if(document.getElementById('user-email-display')) document.getElementById('user-email-display').innerText = "Trạng thái: Khách (Chưa đăng nhập)";
+        if(authBtnText) authBtnText.innerText = "Đăng nhập";
+        if(authGearIcon) authGearIcon.classList.add('hidden'); 
     }
-    loadRooms(); 
-    if(!currentRoomId) openPrivateChat(); 
+    
+    // Chỉ chạy chat logic nếu đang ở trang chat.html
+    if(document.getElementById('room-list')) {
+        loadRooms(); 
+        if(!currentRoomId) openPrivateChat(); 
+    }
 });
 
-authBtn.addEventListener('click', () => {
-    if (!currentUser) window.location.href = 'auth.html'; 
-    else {
-        document.getElementById('settings-modal').classList.remove('hidden');
-        document.getElementById('settings-name-input').value = currentUser.displayName || '';
-        tempSettingsAvatar = userAvatarStr;
-        updateSettingsPreview();
-    }
-});
+if(authBtn) {
+    authBtn.addEventListener('click', () => {
+        if (!currentUser) window.location.href = 'auth.html'; 
+        else {
+            document.getElementById('settings-modal').classList.remove('hidden');
+            document.getElementById('settings-name-input').value = currentUser.displayName || '';
+            tempSettingsAvatar = userAvatarStr;
+            updateSettingsPreview();
+        }
+    });
+}
 
 /* ==========================================
    LINK MỜI THAM GIA NHÓM
 ========================================== */
 async function checkInviteLink() {
+    if(!document.getElementById('invite-link-modal')) return;
+    
     const urlParams = new URLSearchParams(window.location.search);
     const inviteRoomId = urlParams.get('join');
     if (!inviteRoomId || !currentUser) return;
@@ -144,6 +173,8 @@ let tempSettingsAvatar = userAvatarStr;
 
 function updateSettingsPreview() {
     const previewBox = document.getElementById('settings-avatar-preview');
+    if(!previewBox) return;
+    
     if (tempSettingsAvatar) {
         previewBox.innerHTML = `<img src="${tempSettingsAvatar}" class="w-full h-full object-cover">`;
     } else {
@@ -152,61 +183,71 @@ function updateSettingsPreview() {
     }
 }
 
-document.getElementById('close-settings-modal').addEventListener('click', () => { document.getElementById('settings-modal').classList.add('hidden'); });
+const closeSettingsBtn = document.getElementById('close-settings-modal');
+if(closeSettingsBtn) closeSettingsBtn.addEventListener('click', () => { document.getElementById('settings-modal').classList.add('hidden'); });
 
-document.getElementById('settings-avatar-upload').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            tempSettingsAvatar = event.target.result;
-            updateSettingsPreview();
-        };
-        reader.readAsDataURL(file);
-    }
-});
-
-document.getElementById('save-settings-btn').addEventListener('click', async () => {
-    const newName = document.getElementById('settings-name-input').value.trim();
-    if (!newName) return alert("Tên không được để trống!");
-
-    if (tempSettingsAvatar) {
-        userAvatarStr = tempSettingsAvatar;
-        localStorage.setItem('userAvatar', tempSettingsAvatar);
-    }
-
-    document.getElementById('save-settings-btn').innerText = "Đang lưu...";
-    
-    try {
-        await updateProfile(currentUser, { displayName: newName });
-        
-        await set(ref(db, `users/${currentUser.uid}`), {
-            name: newName,
-            avatar: userAvatarStr
-        });
-
-        document.getElementById('save-settings-btn').innerText = "Lưu Thay Đổi";
-        document.getElementById('user-email-display').innerText = "Tài khoản: " + newName;
-        document.getElementById('settings-modal').classList.add('hidden');
-        
-        if (currentMode === 'group' && currentRoomId) {
-            update(ref(db, `rooms/${currentRoomId}/members/${currentUser.uid}`), { name: newName, avatar: userAvatarStr });
+const settingsAvatarUpload = document.getElementById('settings-avatar-upload');
+if(settingsAvatarUpload) {
+    settingsAvatarUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                tempSettingsAvatar = event.target.result;
+                updateSettingsPreview();
+            };
+            reader.readAsDataURL(file);
         }
-        alert("Cập nhật thông tin thành công!");
-    } catch (error) {
-        alert("Lỗi: " + error.message);
-        document.getElementById('save-settings-btn').innerText = "Lưu Thay Đổi";
-    }
-});
+    });
+}
 
-document.getElementById('logout-settings-btn').addEventListener('click', () => {
-    if (confirm("Bạn có chắc chắn muốn đăng xuất?")) {
-        signOut(auth).then(() => {
+const saveSettingsBtn = document.getElementById('save-settings-btn');
+if(saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', async () => {
+        const newName = document.getElementById('settings-name-input').value.trim();
+        if (!newName) return alert("Tên không được để trống!");
+
+        if (tempSettingsAvatar) {
+            userAvatarStr = tempSettingsAvatar;
+            localStorage.setItem('userAvatar', tempSettingsAvatar);
+        }
+
+        document.getElementById('save-settings-btn').innerText = "Đang lưu...";
+        
+        try {
+            await updateProfile(currentUser, { displayName: newName });
+            
+            await set(ref(db, `users/${currentUser.uid}`), {
+                name: newName,
+                avatar: userAvatarStr
+            });
+
+            document.getElementById('save-settings-btn').innerText = "Lưu Thay Đổi";
+            document.getElementById('user-email-display').innerText = "Tài khoản: " + newName;
             document.getElementById('settings-modal').classList.add('hidden');
-            window.location.reload();
-        });
-    }
-});
+            
+            if (currentMode === 'group' && currentRoomId) {
+                update(ref(db, `rooms/${currentRoomId}/members/${currentUser.uid}`), { name: newName, avatar: userAvatarStr });
+            }
+            alert("Cập nhật thông tin thành công!");
+        } catch (error) {
+            alert("Lỗi: " + error.message);
+            document.getElementById('save-settings-btn').innerText = "Lưu Thay Đổi";
+        }
+    });
+}
+
+const logoutBtn = document.getElementById('logout-settings-btn');
+if(logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+        if (confirm("Bạn có chắc chắn muốn đăng xuất?")) {
+            signOut(auth).then(() => {
+                document.getElementById('settings-modal').classList.add('hidden');
+                window.location.reload();
+            });
+        }
+    });
+}
 
 /* ==========================================
    TẠO VÀ HIỂN THỊ NHÓM
@@ -214,67 +255,85 @@ document.getElementById('logout-settings-btn').addEventListener('click', () => {
 let roomType = 'public';
 let roomAvatarBase64 = null;
 
-document.getElementById('btn-open-create-room').addEventListener('click', () => {
-    if (!currentUser) return alert("Bạn phải Đăng nhập để tạo nhóm chat!");
-    document.getElementById('create-room-modal').classList.remove('hidden');
-});
+const btnOpenCreate = document.getElementById('btn-open-create-room');
+if(btnOpenCreate) {
+    btnOpenCreate.addEventListener('click', () => {
+        if (!currentUser) return alert("Bạn phải Đăng nhập để tạo nhóm chat!");
+        document.getElementById('create-room-modal').classList.remove('hidden');
+    });
+}
 
-document.getElementById('close-create-room').addEventListener('click', () => document.getElementById('create-room-modal').classList.add('hidden'));
+const closeCreateRoom = document.getElementById('close-create-room');
+if(closeCreateRoom) closeCreateRoom.addEventListener('click', () => document.getElementById('create-room-modal').classList.add('hidden'));
 
-document.getElementById('btn-public').addEventListener('click', () => {
-    roomType = 'public';
-    document.getElementById('btn-public').className = "flex-1 py-2 rounded-lg font-medium border-2 border-blue-600 bg-blue-50 text-blue-600";
-    document.getElementById('btn-private').className = "flex-1 py-2 rounded-lg font-medium border-2 border-slate-200 bg-white text-slate-600";
-    document.getElementById('room-password-container').classList.add('hidden');
-});
+const btnPublic = document.getElementById('btn-public');
+if(btnPublic) {
+    btnPublic.addEventListener('click', () => {
+        roomType = 'public';
+        document.getElementById('btn-public').className = "flex-1 py-2 rounded-lg font-medium border-2 border-blue-600 bg-blue-50 text-blue-600 transition text-sm md:text-base";
+        document.getElementById('btn-private').className = "flex-1 py-2 rounded-lg font-medium border-2 border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 text-sm md:text-base";
+        document.getElementById('room-password-container').classList.add('hidden');
+    });
+}
 
-document.getElementById('btn-private').addEventListener('click', () => {
-    roomType = 'private';
-    document.getElementById('btn-private').className = "flex-1 py-2 rounded-lg font-medium border-2 border-blue-600 bg-blue-50 text-blue-600";
-    document.getElementById('btn-public').className = "flex-1 py-2 rounded-lg font-medium border-2 border-slate-200 bg-white text-slate-600";
-    document.getElementById('room-password-container').classList.remove('hidden');
-});
+const btnPrivate = document.getElementById('btn-private');
+if(btnPrivate) {
+    btnPrivate.addEventListener('click', () => {
+        roomType = 'private';
+        document.getElementById('btn-private').className = "flex-1 py-2 rounded-lg font-medium border-2 border-blue-600 bg-blue-50 text-blue-600 transition text-sm md:text-base";
+        document.getElementById('btn-public').className = "flex-1 py-2 rounded-lg font-medium border-2 border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 text-sm md:text-base";
+        document.getElementById('room-password-container').classList.remove('hidden');
+    });
+}
 
-document.getElementById('room-avatar-upload').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            roomAvatarBase64 = event.target.result;
-            document.getElementById('room-avatar-preview').innerHTML = `<img src="${roomAvatarBase64}" class="w-full h-full object-cover">`;
-        };
-        reader.readAsDataURL(file);
-    }
-});
-
-document.getElementById('confirm-create-room').addEventListener('click', async () => {
-    const name = document.getElementById('room-name-input').value.trim();
-    const password = document.getElementById('room-password-input').value;
-    
-    if (!name) return alert("Vui lòng nhập tên nhóm!");
-    if (roomType === 'private' && !password) return alert("Vui lòng nhập mật khẩu cho nhóm bảo mật!");
-
-    const myName = currentUser.displayName || currentUser.email;
-    const newRoomRef = push(ref(db, 'rooms'));
-    await set(newRoomRef, { 
-        name: name, type: roomType, password: roomType === 'private' ? password : "", avatar: roomAvatarBase64, timestamp: Date.now(), creatorId: currentUser.uid,
-        members: {
-            [currentUser.uid]: { name: myName, avatar: userAvatarStr, role: 'creator' }
+const roomAvatarUpload = document.getElementById('room-avatar-upload');
+if(roomAvatarUpload) {
+    roomAvatarUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                roomAvatarBase64 = event.target.result;
+                document.getElementById('room-avatar-preview').innerHTML = `<img src="${roomAvatarBase64}" class="w-full h-full object-cover">`;
+            };
+            reader.readAsDataURL(file);
         }
     });
+}
 
-    push(ref(db, `group_messages/${newRoomRef.key}`), { sender: 'system', text: `${myName} đã tạo nhóm.`, timestamp: Date.now() });
-    
-    document.getElementById('create-room-modal').classList.add('hidden');
-    document.getElementById('room-name-input').value = "";
-    document.getElementById('room-password-input').value = "";
-    document.getElementById('room-avatar-preview').innerHTML = `<span class="text-slate-500 text-sm">Ảnh</span>`;
-    roomAvatarBase64 = null;
-    alert("Tạo nhóm thành công!");
-});
+const confirmCreateRoom = document.getElementById('confirm-create-room');
+if(confirmCreateRoom) {
+    confirmCreateRoom.addEventListener('click', async () => {
+        const name = document.getElementById('room-name-input').value.trim();
+        const password = document.getElementById('room-password-input').value;
+        
+        if (!name) return alert("Vui lòng nhập tên nhóm!");
+        if (roomType === 'private' && !password) return alert("Vui lòng nhập mật khẩu cho nhóm bảo mật!");
+
+        const myName = currentUser.displayName || currentUser.email;
+        const newRoomRef = push(ref(db, 'rooms'));
+        await set(newRoomRef, { 
+            name: name, type: roomType, password: roomType === 'private' ? password : "", avatar: roomAvatarBase64, timestamp: Date.now(), creatorId: currentUser.uid,
+            members: {
+                [currentUser.uid]: { name: myName, avatar: userAvatarStr, role: 'creator' }
+            }
+        });
+
+        push(ref(db, `group_messages/${newRoomRef.key}`), { sender: 'system', text: `${myName} đã tạo nhóm.`, timestamp: Date.now() });
+        
+        document.getElementById('create-room-modal').classList.add('hidden');
+        document.getElementById('room-name-input').value = "";
+        document.getElementById('room-password-input').value = "";
+        document.getElementById('room-avatar-preview').innerHTML = `<span class="text-slate-500 text-sm">Ảnh</span>`;
+        roomAvatarBase64 = null;
+        alert("Tạo nhóm thành công!");
+    });
+}
 
 function loadRooms() {
     const roomListDiv = document.getElementById('room-list');
+    if(!roomListDiv) return;
+
     onValue(ref(db, 'rooms'), (snapshot) => {
         roomListDiv.innerHTML = '<p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">Cộng đồng (Nhóm chung)</p>';
         snapshot.forEach((childSnapshot) => {
@@ -322,14 +381,15 @@ function loadRooms() {
 /* ==========================================
    VÀO NHÓM VÀ TÙY CHỌN NHÓM
 ========================================== */
-
-// 👉 ĐÂY CHÍNH LÀ DÒNG CODE BẮT SỰ KIỆN BỊ THIẾU
-document.getElementById('btn-private-chat').addEventListener('click', openPrivateChat);
+const btnPrivateChat = document.getElementById('btn-private-chat');
+if (btnPrivateChat) {
+    btnPrivateChat.addEventListener('click', openPrivateChat);
+}
 
 let pendingRoomId = null;
 let pendingRoomData = null;
 
-function handleJoinRoomReq(roomId, roomData) {
+window.handleJoinRoomReq = function(roomId, roomData) {
     if (!currentUser) return alert("Bạn cần Đăng nhập để vào nhóm!");
 
     const isMember = roomData.members && roomData.members[currentUser.uid];
@@ -349,20 +409,24 @@ function handleJoinRoomReq(roomId, roomData) {
     }
 }
 
-document.getElementById('cancel-join-room').addEventListener('click', () => { document.getElementById('join-room-modal').classList.add('hidden'); });
+const cancelJoinRoom = document.getElementById('cancel-join-room');
+if(cancelJoinRoom) cancelJoinRoom.addEventListener('click', () => { document.getElementById('join-room-modal').classList.add('hidden'); });
 
-document.getElementById('confirm-join-room').addEventListener('click', async () => {
-    const pass = document.getElementById('join-password').value;
-    if (pass !== pendingRoomData.password) return alert("Mật khẩu nhóm không đúng!");
-    
-    const myName = currentUser.displayName || currentUser.email;
-    await set(ref(db, `rooms/${pendingRoomId}/members/${currentUser.uid}`), { name: myName, avatar: userAvatarStr, role: 'member' });
-    
-    push(ref(db, `group_messages/${pendingRoomId}`), { sender: 'system', text: `${myName} đã tham gia nhóm.`, timestamp: Date.now() });
+const confirmJoinRoom = document.getElementById('confirm-join-room');
+if(confirmJoinRoom) {
+    confirmJoinRoom.addEventListener('click', async () => {
+        const pass = document.getElementById('join-password').value;
+        if (pass !== pendingRoomData.password) return alert("Mật khẩu nhóm không đúng!");
+        
+        const myName = currentUser.displayName || currentUser.email;
+        await set(ref(db, `rooms/${pendingRoomId}/members/${currentUser.uid}`), { name: myName, avatar: userAvatarStr, role: 'member' });
+        
+        push(ref(db, `group_messages/${pendingRoomId}`), { sender: 'system', text: `${myName} đã tham gia nhóm.`, timestamp: Date.now() });
 
-    document.getElementById('join-room-modal').classList.add('hidden');
-    executeJoinRoom(pendingRoomId, pendingRoomData);
-});
+        document.getElementById('join-room-modal').classList.add('hidden');
+        executeJoinRoom(pendingRoomId, pendingRoomData);
+    });
+}
 
 let roomListener = null;
 
@@ -375,7 +439,7 @@ function executeJoinRoom(roomId, roomData) {
     document.getElementById('btn-group-options').classList.remove('hidden'); 
 
     document.getElementById('room-title').innerHTML = `<span id="room-icon">🌍</span> Nhóm: <span id="header-room-name">${roomData.name}</span>`;
-    document.getElementById('user-input').placeholder = "Nhắn với nhóm (Tag @bot để gọi AI)...";
+    document.getElementById('user-input').placeholder = "Nhắn với nhóm (@bot để gọi AI)...";
 
     if (roomListener) off(roomListener);
     roomListener = ref(db, `rooms/${roomId}`);
@@ -404,6 +468,9 @@ function executeJoinRoom(roomId, roomData) {
         const msg = snapshot.val();
         renderMessage(msg.sender, msg.text, msg.name, msg.avatar);
     });
+
+    // Ẩn sidebar trên mobile khi vào phòng
+    window.closeSidebarMobile();
 }
 
 function openPrivateChat() {
@@ -434,19 +501,29 @@ function openPrivateChat() {
     } else {
         renderMessage('ai', 'Chào bạn! Đăng nhập để AI có thể lưu lại lịch sử nhé!', 'Trợ lý AI');
     }
+
+    // Ẩn sidebar trên mobile
+    window.closeSidebarMobile();
 }
 
 /* ==========================================
    DRAWER TÙY CHỌN NHÓM & QUẢN LÝ THÀNH VIÊN
 ========================================== */
 const drawer = document.getElementById('group-drawer');
-document.getElementById('btn-group-options').addEventListener('click', () => {
-    drawer.classList.remove('translate-x-full');
-    renderDrawerData();
-});
-document.getElementById('close-drawer-btn').addEventListener('click', closeGroupDrawer);
+const btnGroupOpts = document.getElementById('btn-group-options');
+if(btnGroupOpts) {
+    btnGroupOpts.addEventListener('click', () => {
+        drawer.classList.remove('translate-x-full');
+        renderDrawerData();
+    });
+}
 
-function closeGroupDrawer() { drawer.classList.add('translate-x-full'); }
+const closeDrawerBtn = document.getElementById('close-drawer-btn');
+if(closeDrawerBtn) closeDrawerBtn.addEventListener('click', closeGroupDrawer);
+
+function closeGroupDrawer() { 
+    if(drawer) drawer.classList.add('translate-x-full'); 
+}
 
 function renderDrawerData() {
     if (!currentRoomData || !currentRoomData.members) return;
@@ -497,9 +574,9 @@ function renderDrawerData() {
         let actionsHtml = '';
         if (!isMe && isAdmin) { 
             if (mData.role !== 'creator' && !(myRole === 'admin' && mData.role === 'admin')) {
-                let promoteBtn = isCreator && mData.role === 'member' ? `<button onclick="promoteAdmin('${uid}')" class="text-xs text-blue-600 hover:underline">Thăng cấp</button>` : '';
-                let kickBtn = `<button onclick="kickMember('${uid}', '${mData.name}')" class="text-xs text-red-600 hover:underline">Kick</button>`;
-                actionsHtml = `<div class="flex gap-2">${promoteBtn}${kickBtn}</div>`;
+                let promoteBtn = isCreator && mData.role === 'member' ? `<button onclick="promoteAdmin('${uid}')" class="text-[10px] md:text-xs text-blue-600 hover:underline">Thăng cấp</button>` : '';
+                let kickBtn = `<button onclick="kickMember('${uid}', '${mData.name}')" class="text-[10px] md:text-xs text-red-600 hover:underline">Kick</button>`;
+                actionsHtml = `<div class="flex gap-2 ml-2">${promoteBtn}${kickBtn}</div>`;
             }
         }
 
@@ -507,10 +584,10 @@ function renderDrawerData() {
         
         listDiv.innerHTML += `
             <div class="flex items-center justify-between p-2 hover:bg-slate-100 rounded-lg group">
-                <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 rounded-full bg-slate-300 flex items-center justify-center font-bold overflow-hidden">${avatarH}</div>
-                    <div class="flex flex-col">
-                        <span class="text-sm font-medium text-slate-700">${mData.name} ${isMe ? '(Bạn)' : ''}</span>
+                <div class="flex items-center gap-2 overflow-hidden">
+                    <div class="w-8 h-8 rounded-full bg-slate-300 flex items-center justify-center font-bold overflow-hidden flex-shrink-0">${avatarH}</div>
+                    <div class="flex flex-col overflow-hidden">
+                        <span class="text-xs md:text-sm font-medium text-slate-700 truncate">${mData.name} ${isMe ? '(Bạn)' : ''}</span>
                         ${roleBadge}
                     </div>
                 </div>
@@ -520,42 +597,57 @@ function renderDrawerData() {
     });
 }
 
-document.getElementById('edit-group-avatar').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(event) { update(ref(db, `rooms/${currentRoomId}`), { avatar: event.target.result }); };
-        reader.readAsDataURL(file);
-    }
-});
+const editGroupAvatar = document.getElementById('edit-group-avatar');
+if(editGroupAvatar) {
+    editGroupAvatar.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) { update(ref(db, `rooms/${currentRoomId}`), { avatar: event.target.result }); };
+            reader.readAsDataURL(file);
+        }
+    });
+}
 
-document.getElementById('btn-save-group-name').addEventListener('click', () => {
-    const newName = document.getElementById('drawer-group-name').value.trim();
-    if (newName) {
-        update(ref(db, `rooms/${currentRoomId}`), { name: newName });
-        document.getElementById('btn-save-group-name').classList.add('hidden');
-    }
-});
+const btnSaveGroupName = document.getElementById('btn-save-group-name');
+if(btnSaveGroupName) {
+    btnSaveGroupName.addEventListener('click', () => {
+        const newName = document.getElementById('drawer-group-name').value.trim();
+        if (newName) {
+            update(ref(db, `rooms/${currentRoomId}`), { name: newName });
+            document.getElementById('btn-save-group-name').classList.add('hidden');
+        }
+    });
+}
 
-document.getElementById('btn-copy-link').addEventListener('click', () => {
-    const inviteLink = window.location.origin + window.location.pathname + '?join=' + currentRoomId;
-    navigator.clipboard.writeText(inviteLink).then(() => alert("Đã copy link mời! Hãy gửi cho bạn bè nhé."));
-});
+const btnCopyLink = document.getElementById('btn-copy-link');
+if(btnCopyLink) {
+    btnCopyLink.addEventListener('click', () => {
+        const inviteLink = window.location.origin + window.location.pathname + '?join=' + currentRoomId;
+        navigator.clipboard.writeText(inviteLink).then(() => alert("Đã copy link mời! Hãy gửi cho bạn bè nhé."));
+    });
+}
 
-document.getElementById('btn-delete-group').addEventListener('click', () => {
-    if(confirm("Bạn có chắc chắn muốn giải tán nhóm này vĩnh viễn?")) {
-        remove(ref(db, `rooms/${currentRoomId}`));
-        remove(ref(db, `group_messages/${currentRoomId}`));
-    }
-});
+const btnDeleteGroup = document.getElementById('btn-delete-group');
+if(btnDeleteGroup) {
+    btnDeleteGroup.addEventListener('click', () => {
+        if(confirm("Bạn có chắc chắn muốn giải tán nhóm này vĩnh viễn?")) {
+            remove(ref(db, `rooms/${currentRoomId}`));
+            remove(ref(db, `group_messages/${currentRoomId}`));
+        }
+    });
+}
 
-document.getElementById('btn-leave-group').addEventListener('click', async () => {
-    if(confirm("Bạn có chắc chắn muốn rời nhóm này?")) {
-        const myName = currentUser.displayName || currentUser.email;
-        await push(ref(db, `group_messages/${currentRoomId}`), { sender: 'system', text: `${myName} đã rời nhóm.`, timestamp: Date.now() });
-        await remove(ref(db, `rooms/${currentRoomId}/members/${currentUser.uid}`));
-    }
-});
+const btnLeaveGroup = document.getElementById('btn-leave-group');
+if(btnLeaveGroup) {
+    btnLeaveGroup.addEventListener('click', async () => {
+        if(confirm("Bạn có chắc chắn muốn rời nhóm này?")) {
+            const myName = currentUser.displayName || currentUser.email;
+            await push(ref(db, `group_messages/${currentRoomId}`), { sender: 'system', text: `${myName} đã rời nhóm.`, timestamp: Date.now() });
+            await remove(ref(db, `rooms/${currentRoomId}/members/${currentUser.uid}`));
+        }
+    });
+}
 
 window.kickMember = (uid, memberName) => {
     if(confirm("Kick thành viên này khỏi nhóm?")) {
@@ -574,8 +666,11 @@ window.promoteAdmin = (uid) => {
    XỬ LÝ GỬI TIN NHẮN CHAT
 ========================================== */
 const userInput = document.getElementById('user-input');
-document.getElementById('send-btn').addEventListener('click', handleSend);
-userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
+const sendBtn = document.getElementById('send-btn');
+if(sendBtn && userInput) {
+    sendBtn.addEventListener('click', handleSend);
+    userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
+}
 
 async function handleSend() {
     const text = userInput.value.trim();
@@ -637,12 +732,14 @@ async function handleSend() {
 
 function renderMessage(sender, text, displayN, customAvatar, idOverride = null) {
     const chatBox = document.getElementById('chat-box');
+    if(!chatBox) return;
+
     const msgDiv = document.createElement('div');
     if (idOverride) msgDiv.id = idOverride;
     
     if (sender === 'system') {
         msgDiv.className = "flex justify-center w-full my-3";
-        msgDiv.innerHTML = `<span class="text-xs text-slate-500 bg-slate-200/60 px-4 py-1.5 rounded-full font-medium text-center shadow-sm">${text}</span>`;
+        msgDiv.innerHTML = `<span class="text-[10px] md:text-xs text-slate-500 bg-slate-200/60 px-4 py-1.5 rounded-full font-medium text-center shadow-sm">${text}</span>`;
         chatBox.appendChild(msgDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
         return; 
@@ -652,22 +749,22 @@ function renderMessage(sender, text, displayN, customAvatar, idOverride = null) 
     const isMe = (sender === 'user' && displayN === myName);
     const isAi = (sender === 'ai');
 
-    msgDiv.className = `flex gap-4 ${isMe ? 'flex-row-reverse' : ''} mb-4`;
+    msgDiv.className = `flex gap-2 md:gap-4 ${isMe ? 'flex-row-reverse' : ''} mb-4`;
 
     const avatarDiv = document.createElement('div');
-    avatarDiv.className = `w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden ${isMe ? 'bg-slate-800 border-2 border-slate-300' : (isAi ? 'bg-blue-500 border-2 border-blue-200' : 'bg-gray-400')}`;
+    avatarDiv.className = `w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden ${isMe ? 'bg-slate-800 border-2 border-slate-300' : (isAi ? 'bg-blue-500 border-2 border-blue-200' : 'bg-gray-400')}`;
     if (customAvatar) avatarDiv.innerHTML = `<img src="${customAvatar}" class="w-full h-full object-cover">`;
     else avatarDiv.innerText = isMe ? "U" : (isAi ? "AI" : (displayN ? displayN.charAt(0).toUpperCase() : 'X'));
 
     const contentWrapper = document.createElement('div');
-    contentWrapper.className = `flex flex-col max-w-[80%] ${isMe ? 'items-end' : 'items-start'}`;
+    contentWrapper.className = `flex flex-col max-w-[85%] md:max-w-[80%] ${isMe ? 'items-end' : 'items-start'}`;
 
     const nameLabel = document.createElement('span');
-    nameLabel.className = "text-xs text-slate-400 mb-1 px-1 font-medium";
+    nameLabel.className = "text-[10px] md:text-xs text-slate-400 mb-1 px-1 font-medium";
     nameLabel.innerText = isMe ? "Bạn" : (isAi ? "🤖 Trợ lý AI" : displayN);
     
     const contentBox = document.createElement('div');
-    contentBox.className = `p-4 rounded-2xl msg-content shadow-sm overflow-x-auto ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'}`;
+    contentBox.className = `p-3 md:p-4 rounded-2xl msg-content shadow-sm overflow-x-auto text-sm md:text-base ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'}`;
     
     if (text === "...") {
         contentBox.innerHTML = `<span class="w-2 h-2 bg-slate-400 rounded-full inline-block animate-bounce"></span>
