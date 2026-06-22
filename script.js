@@ -40,14 +40,12 @@ onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
         
-        // --- ĐOẠN MỚI THÊM: TỰ ĐỘNG TẢI LẠI AVATAR TỪ FIREBASE ---
         const userRef = ref(db, `users/${user.uid}`);
         const userSnap = await get(userRef);
         if (userSnap.exists() && userSnap.val().avatar) {
             userAvatarStr = userSnap.val().avatar;
             localStorage.setItem('userAvatar', userAvatarStr);
         }
-        // --------------------------------------------------------
 
         const displayName = user.displayName || user.email;
         document.getElementById('user-email-display').innerText = "Tài khoản: " + displayName;
@@ -182,12 +180,10 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
     try {
         await updateProfile(currentUser, { displayName: newName });
         
-        // --- ĐOẠN MỚI THÊM: LƯU AVATAR VÀO FIREBASE KHI BẤM LƯU ---
         await set(ref(db, `users/${currentUser.uid}`), {
             name: newName,
             avatar: userAvatarStr
         });
-        // ---------------------------------------------------------
 
         document.getElementById('save-settings-btn').innerText = "Lưu Thay Đổi";
         document.getElementById('user-email-display').innerText = "Tài khoản: " + newName;
@@ -326,6 +322,10 @@ function loadRooms() {
 /* ==========================================
    VÀO NHÓM VÀ TÙY CHỌN NHÓM
 ========================================== */
+
+// 👉 ĐÂY CHÍNH LÀ DÒNG CODE BẮT SỰ KIỆN BỊ THIẾU
+document.getElementById('btn-private-chat').addEventListener('click', openPrivateChat);
+
 let pendingRoomId = null;
 let pendingRoomData = null;
 
