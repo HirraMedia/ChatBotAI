@@ -2,10 +2,10 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     scroll-behavior: smooth;
-    /* KHÔNG ĐƯỢC để overflow: hidden ở đây vì sẽ làm liệt cuộn Trang Chủ */
+    /* Đã xóa overflow: hidden ở đây để trang chủ cuộn bình thường */
 }
 
-/* Fix lỗi lẹm tai thỏ khi xoay màn hình ngang trên điện thoại */
+/* Fix lỗi lẹm tai thỏ khi xoay màn hình ngang (Landscape Mode) trên điện thoại */
 @supports (padding: max(0px)) {
     body {
         padding-left: env(safe-area-inset-left);
@@ -51,7 +51,7 @@ body {
     border-color: transparent transparent #38bdf8 transparent; 
 }
 
-/* --- TÙY CHỈNH THANH CUỘN --- */
+/* --- TÙY CHỈNH THANH CUỘN (SCROLLBAR) --- */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #f1f5f9; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -66,6 +66,7 @@ body {
     margin: 10px 0;
     color: #e2e8f0;
 }
+
 .msg-content code {
     font-family: monospace;
     color: #38bdf8;
@@ -73,6 +74,7 @@ body {
     padding: 2px 4px;
     border-radius: 4px;
 }
+
 .msg-content pre code {
     background-color: transparent;
     color: inherit;
