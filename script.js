@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebas
 import { getAuth, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
 import { getDatabase, ref, push, onChildAdded, onValue, off, get, update, remove, set } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
-const GROQ_API_KEY = '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';
+const GROQ_API_KEY = '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';
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 const firebaseConfig = {
@@ -698,19 +698,36 @@ async function handleSend() {
 
         try {
             let apiMessages = [];
-            if (!isGroup) apiMessages = sessionHistory; 
-            else apiMessages = [{ role: "user", content: `(Chuyên môn SQL) ${text.replace(/@bot/g, '').trim()}` }];
+if (!isGroup) {
+    // Tạo bản sao của lịch sử hiện tại
+    apiMessages = [...sessionHistory];
+    
+    // Ép tin nhắn hiện tại vào mảng gọi API ngay lập tức, 
+    // không chờ sự kiện onChildAdded của Firebase
+    if (apiMessages.length === 0 || apiMessages[apiMessages.length - 1].content !== text) {
+        apiMessages.push({ role: "user", content: text });
+    }
+} else {
+    apiMessages = [{ role: "user", content: `(Chuyên môn SQL) ${text.replace(/@bot/g, '').trim()}` }];
+}
 
             const response = await fetch(GROQ_API_URL, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: apiMessages })
             });
+const data = await response.json();
+document.getElementById(typingId)?.remove();
 
-            const data = await response.json();
-            document.getElementById(typingId)?.remove();
+// Nếu API trả về lỗi (VD: 400, 401, 429), in thẳng ra màn hình
+if (!response.ok || data.error) {
+    if(!isGroup) {
+        renderMessage('ai', `⚠️ Lỗi API: ${data.error?.message || response.statusText}`, 'Trợ lý AI');
+    }
+    return;
+}
 
-            if (data.choices && data.choices.length > 0) {
+if (data.choices && data.choices.length > 0) {
                 const aiReply = data.choices[0].message.content;
                 const aiMsgData = { sender: 'ai', text: aiReply, name: 'Trợ lý AI', avatar: botAvatarStr, timestamp: Date.now() };
 
