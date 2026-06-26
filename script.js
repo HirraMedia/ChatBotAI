@@ -1,9 +1,12 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
-import { getDatabase, ref, push, onChildAdded, onValue, off, get, update, remove, set } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+import { getDatabase, ref, push, onChildAdded, onChildChanged, onValue, off, get, update, remove, set } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
-const GROQ_API_KEY = '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';
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+// ==========================================
+// CẤU HÌNH API GEMINI & FIREBASE
+// ==========================================
+const GEMINI_API_KEY = 'AQ.Ab8RN6IpqPD7oiXBmN4VMQckflpzOKfKUx6LJLMSk7c1ygUAJg'; // Lưu ý: Nếu báo lỗi API, hãy kiểm tra lại Key (thường bắt đầu bằng AIza...)
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
 
 const firebaseConfig = {
     apiKey: "AIzaSyBWvxVVnoOEoK7DlkvH4GMy2TZ5UyItn5A",
@@ -19,15 +22,25 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
+// ==========================================
+// BIẾN TOÀN CỤC
+// ==========================================
 let currentUser = null;
 let currentMode = 'private'; 
 let currentRoomId = null;
 let currentRoomData = null; 
 let currentChatListener = null; 
-let sessionHistory = [{ role: "system", content: "Bạn là AI giải bài tập SQL." }];
+let currentChatEditListener = null;
+let currentReplyData = null;
 
 let userAvatarStr = localStorage.getItem('userAvatar') || null;
 let botAvatarStr = localStorage.getItem('botAvatar') || null;
+
+// Khởi tạo lịch sử chat cho Gemini
+let sessionHistory = [
+    { role: "user", parts: [{ text: "Từ giờ bạn là một chuyên gia AI về SQL. Hãy giúp tôi giải bài tập và sửa lỗi SQL." }] },
+    { role: "model", parts: [{ text: "Chào bạn, tôi là AI chuyên gia SQL. Tôi đã sẵn sàng giúp bạn!" }] }
+];
 
 /* ==========================================
    LOGIC GIAO DIỆN MENU MOBILE
@@ -41,12 +54,10 @@ window.openSidebarMobile = function() {
     if(mainSidebar) mainSidebar.classList.remove('-translate-x-full');
     if(sidebarOverlay) sidebarOverlay.classList.remove('hidden');
 }
-
 window.closeSidebarMobile = function() {
     if(mainSidebar) mainSidebar.classList.add('-translate-x-full');
     if(sidebarOverlay) sidebarOverlay.classList.add('hidden');
 }
-
 if (btnOpenSidebar) btnOpenSidebar.addEventListener('click', openSidebarMobile);
 if (btnCloseSidebar) btnCloseSidebar.addEventListener('click', closeSidebarMobile);
 if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebarMobile);
@@ -70,10 +81,8 @@ onAuthStateChanged(auth, async (user) => {
 
         const displayName = user.displayName || user.email;
         if(document.getElementById('user-email-display')) document.getElementById('user-email-display').innerText = "Tài khoản: " + displayName;
-        
         if(authBtnText) authBtnText.innerText = "Tài khoản";
         if(authGearIcon) authGearIcon.classList.remove('hidden');
-        
         await checkInviteLink();
     } else {
         currentUser = null;
@@ -82,7 +91,6 @@ onAuthStateChanged(auth, async (user) => {
         if(authGearIcon) authGearIcon.classList.add('hidden'); 
     }
     
-    // Chỉ chạy chat logic nếu đang ở trang chat.html
     if(document.getElementById('room-list')) {
         loadRooms(); 
         if(!currentRoomId) openPrivateChat(); 
@@ -106,7 +114,6 @@ if(authBtn) {
 ========================================== */
 async function checkInviteLink() {
     if(!document.getElementById('invite-link-modal')) return;
-    
     const urlParams = new URLSearchParams(window.location.search);
     const inviteRoomId = urlParams.get('join');
     if (!inviteRoomId || !currentUser) return;
@@ -119,7 +126,6 @@ async function checkInviteLink() {
     }
 
     const rData = snapshot.val();
-    
     if (rData.members && rData.members[currentUser.uid]) {
         executeJoinRoom(inviteRoomId, rData);
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -128,11 +134,8 @@ async function checkInviteLink() {
 
     document.getElementById('invite-link-modal').classList.remove('hidden');
     document.getElementById('invite-link-modal').children[0].classList.replace('scale-95', 'scale-100');
-    
     document.getElementById('invite-room-name').innerText = rData.name;
-    document.getElementById('invite-avatar').innerHTML = rData.avatar 
-        ? `<img src="${rData.avatar}" class="w-full h-full object-cover">` 
-        : `<span class="text-4xl text-slate-400 font-bold">#</span>`;
+    document.getElementById('invite-avatar').innerHTML = rData.avatar ? `<img src="${rData.avatar}" class="w-full h-full object-cover">` : `<span class="text-4xl text-slate-400 font-bold">#</span>`;
 
     const pwdArea = document.getElementById('invite-password-area');
     if (rData.type === 'private') pwdArea.classList.remove('hidden');
@@ -143,18 +146,9 @@ async function checkInviteLink() {
             const pwd = document.getElementById('invite-password').value;
             if (pwd !== rData.password) return alert("Mật khẩu nhóm không đúng!");
         }
-        
         const myName = currentUser.displayName || currentUser.email;
-        await set(ref(db, `rooms/${inviteRoomId}/members/${currentUser.uid}`), {
-            name: myName,
-            avatar: userAvatarStr,
-            role: 'member'
-        });
-
-        push(ref(db, `group_messages/${inviteRoomId}`), {
-            sender: 'system', text: `${myName} đã tham gia nhóm.`, timestamp: Date.now()
-        });
-
+        await set(ref(db, `rooms/${inviteRoomId}/members/${currentUser.uid}`), { name: myName, avatar: userAvatarStr, role: 'member' });
+        push(ref(db, `group_messages/${inviteRoomId}`), { sender: 'system', text: `${myName} đã tham gia nhóm.`, timestamp: Date.now(), type: 'text' });
         document.getElementById('invite-link-modal').classList.add('hidden');
         window.history.replaceState({}, document.title, window.location.pathname);
         executeJoinRoom(inviteRoomId, rData);
@@ -170,17 +164,11 @@ async function checkInviteLink() {
    CÀI ĐẶT NGƯỜI DÙNG
 ========================================== */
 let tempSettingsAvatar = userAvatarStr;
-
 function updateSettingsPreview() {
     const previewBox = document.getElementById('settings-avatar-preview');
     if(!previewBox) return;
-    
-    if (tempSettingsAvatar) {
-        previewBox.innerHTML = `<img src="${tempSettingsAvatar}" class="w-full h-full object-cover">`;
-    } else {
-        const firstLetter = (currentUser.displayName || currentUser.email).charAt(0).toUpperCase();
-        previewBox.innerHTML = `<span class="text-slate-500 text-3xl font-bold">${firstLetter}</span>`;
-    }
+    if (tempSettingsAvatar) previewBox.innerHTML = `<img src="${tempSettingsAvatar}" class="w-full h-full object-cover">`;
+    else previewBox.innerHTML = `<span class="text-slate-500 text-3xl font-bold">${(currentUser.displayName || currentUser.email).charAt(0).toUpperCase()}</span>`;
 }
 
 const closeSettingsBtn = document.getElementById('close-settings-modal');
@@ -206,29 +194,18 @@ if(saveSettingsBtn) {
     saveSettingsBtn.addEventListener('click', async () => {
         const newName = document.getElementById('settings-name-input').value.trim();
         if (!newName) return alert("Tên không được để trống!");
-
         if (tempSettingsAvatar) {
             userAvatarStr = tempSettingsAvatar;
             localStorage.setItem('userAvatar', tempSettingsAvatar);
         }
-
         document.getElementById('save-settings-btn').innerText = "Đang lưu...";
-        
         try {
             await updateProfile(currentUser, { displayName: newName });
-            
-            await set(ref(db, `users/${currentUser.uid}`), {
-                name: newName,
-                avatar: userAvatarStr
-            });
-
+            await set(ref(db, `users/${currentUser.uid}`), { name: newName, avatar: userAvatarStr });
             document.getElementById('save-settings-btn').innerText = "Lưu Thay Đổi";
             document.getElementById('user-email-display').innerText = "Tài khoản: " + newName;
             document.getElementById('settings-modal').classList.add('hidden');
-            
-            if (currentMode === 'group' && currentRoomId) {
-                update(ref(db, `rooms/${currentRoomId}/members/${currentUser.uid}`), { name: newName, avatar: userAvatarStr });
-            }
+            if (currentMode === 'group' && currentRoomId) update(ref(db, `rooms/${currentRoomId}/members/${currentUser.uid}`), { name: newName, avatar: userAvatarStr });
             alert("Cập nhật thông tin thành công!");
         } catch (error) {
             alert("Lỗi: " + error.message);
@@ -306,7 +283,6 @@ if(confirmCreateRoom) {
     confirmCreateRoom.addEventListener('click', async () => {
         const name = document.getElementById('room-name-input').value.trim();
         const password = document.getElementById('room-password-input').value;
-        
         if (!name) return alert("Vui lòng nhập tên nhóm!");
         if (roomType === 'private' && !password) return alert("Vui lòng nhập mật khẩu cho nhóm bảo mật!");
 
@@ -314,12 +290,10 @@ if(confirmCreateRoom) {
         const newRoomRef = push(ref(db, 'rooms'));
         await set(newRoomRef, { 
             name: name, type: roomType, password: roomType === 'private' ? password : "", avatar: roomAvatarBase64, timestamp: Date.now(), creatorId: currentUser.uid,
-            members: {
-                [currentUser.uid]: { name: myName, avatar: userAvatarStr, role: 'creator' }
-            }
+            members: { [currentUser.uid]: { name: myName, avatar: userAvatarStr, role: 'creator' } }
         });
 
-        push(ref(db, `group_messages/${newRoomRef.key}`), { sender: 'system', text: `${myName} đã tạo nhóm.`, timestamp: Date.now() });
+        push(ref(db, `group_messages/${newRoomRef.key}`), { sender: 'system', text: `${myName} đã tạo nhóm.`, timestamp: Date.now(), type: 'text' });
         
         document.getElementById('create-room-modal').classList.add('hidden');
         document.getElementById('room-name-input').value = "";
@@ -382,23 +356,20 @@ function loadRooms() {
    VÀO NHÓM VÀ TÙY CHỌN NHÓM
 ========================================== */
 const btnPrivateChat = document.getElementById('btn-private-chat');
-if (btnPrivateChat) {
-    btnPrivateChat.addEventListener('click', openPrivateChat);
-}
+if (btnPrivateChat) btnPrivateChat.addEventListener('click', openPrivateChat);
 
 let pendingRoomId = null;
 let pendingRoomData = null;
 
 window.handleJoinRoomReq = function(roomId, roomData) {
     if (!currentUser) return alert("Bạn cần Đăng nhập để vào nhóm!");
-
     const isMember = roomData.members && roomData.members[currentUser.uid];
 
     if (isMember || roomData.type === 'public') {
         if (!isMember) {
             const myName = currentUser.displayName || currentUser.email;
             set(ref(db, `rooms/${roomId}/members/${currentUser.uid}`), { name: myName, avatar: userAvatarStr, role: 'member' });
-            push(ref(db, `group_messages/${roomId}`), { sender: 'system', text: `${myName} đã tham gia nhóm.`, timestamp: Date.now() });
+            push(ref(db, `group_messages/${roomId}`), { sender: 'system', text: `${myName} đã tham gia nhóm.`, timestamp: Date.now(), type: 'text' });
         }
         executeJoinRoom(roomId, roomData);
     } else {
@@ -420,8 +391,7 @@ if(confirmJoinRoom) {
         
         const myName = currentUser.displayName || currentUser.email;
         await set(ref(db, `rooms/${pendingRoomId}/members/${currentUser.uid}`), { name: myName, avatar: userAvatarStr, role: 'member' });
-        
-        push(ref(db, `group_messages/${pendingRoomId}`), { sender: 'system', text: `${myName} đã tham gia nhóm.`, timestamp: Date.now() });
+        push(ref(db, `group_messages/${pendingRoomId}`), { sender: 'system', text: `${myName} đã tham gia nhóm.`, timestamp: Date.now(), type: 'text' });
 
         document.getElementById('join-room-modal').classList.add('hidden');
         executeJoinRoom(pendingRoomId, pendingRoomData);
@@ -460,16 +430,16 @@ function executeJoinRoom(roomId, roomData) {
     });
 
     if (currentChatListener) off(currentChatListener);
+    if (currentChatEditListener) off(currentChatEditListener);
     document.getElementById('chat-box').innerHTML = '';
 
     const chatRef = ref(db, `group_messages/${roomId}`);
     currentChatListener = chatRef;
-    onChildAdded(chatRef, (snapshot) => {
-        const msg = snapshot.val();
-        renderMessage(msg.sender, msg.text, msg.name, msg.avatar);
-    });
+    currentChatEditListener = chatRef;
 
-    // Ẩn sidebar trên mobile khi vào phòng
+    onChildAdded(chatRef, (snapshot) => renderMessage(snapshot.key, snapshot.val()));
+    onChildChanged(chatRef, (snapshot) => renderMessage(snapshot.key, snapshot.val()));
+
     window.closeSidebarMobile();
 }
 
@@ -487,22 +457,34 @@ function openPrivateChat() {
     document.getElementById('user-input').placeholder = "Hỏi AI bài tập SQL...";
 
     if (currentChatListener) off(currentChatListener);
+    if (currentChatEditListener) off(currentChatEditListener);
     document.getElementById('chat-box').innerHTML = ''; 
-    sessionHistory = [{ role: "system", content: "Bạn là AI giải bài tập SQL." }];
+    
+    // Khởi tạo lại Lịch sử Gemini khi mở phòng chat riêng
+    sessionHistory = [
+        { role: "user", parts: [{ text: "Từ giờ bạn là một chuyên gia AI về SQL. Hãy giúp tôi giải bài tập và sửa lỗi SQL." }] },
+        { role: "model", parts: [{ text: "Chào bạn, tôi là AI chuyên gia SQL. Tôi đã sẵn sàng giúp bạn!" }] }
+    ];
 
     if (currentUser) {
         const chatRef = ref(db, `private_messages/${currentUser.uid}`);
         currentChatListener = chatRef;
+        currentChatEditListener = chatRef;
+
         onChildAdded(chatRef, (snapshot) => {
             const msg = snapshot.val();
-            renderMessage(msg.sender, msg.text, msg.name || msg.email, msg.avatar);
-            sessionHistory.push({ role: msg.sender === 'ai' ? "assistant" : "user", content: msg.text });
+            renderMessage(snapshot.key, msg);
+            
+            // NGĂN CHẶN LỖI API: Chỉ nạp tin nhắn chữ (text) vào lịch sử AI
+            if (msg.type === 'text' && msg.text !== "Tin nhắn đã được thu hồi") {
+                sessionHistory.push({ role: msg.sender === 'ai' ? "model" : "user", parts: [{ text: msg.text }] });
+            }
         });
+        onChildChanged(chatRef, (snapshot) => renderMessage(snapshot.key, snapshot.val()));
     } else {
-        renderMessage('ai', 'Chào bạn! Đăng nhập để AI có thể lưu lại lịch sử nhé!', 'Trợ lý AI');
+        renderMessage('sys_guest', { sender: 'system', text: 'Chào bạn! Đăng nhập để AI có thể lưu lại lịch sử và dùng đầy đủ tính năng nhé!' });
     }
 
-    // Ẩn sidebar trên mobile
     window.closeSidebarMobile();
 }
 
@@ -517,17 +499,13 @@ if(btnGroupOpts) {
         renderDrawerData();
     });
 }
-
 const closeDrawerBtn = document.getElementById('close-drawer-btn');
 if(closeDrawerBtn) closeDrawerBtn.addEventListener('click', closeGroupDrawer);
 
-function closeGroupDrawer() { 
-    if(drawer) drawer.classList.add('translate-x-full'); 
-}
+function closeGroupDrawer() { if(drawer) drawer.classList.add('translate-x-full'); }
 
 function renderDrawerData() {
     if (!currentRoomData || !currentRoomData.members) return;
-    
     const myRole = currentRoomData.members[currentUser.uid]?.role || 'member';
     const isCreator = myRole === 'creator';
     const isAdmin = myRole === 'admin' || isCreator;
@@ -608,7 +586,6 @@ if(editGroupAvatar) {
         }
     });
 }
-
 const btnSaveGroupName = document.getElementById('btn-save-group-name');
 if(btnSaveGroupName) {
     btnSaveGroupName.addEventListener('click', () => {
@@ -619,7 +596,6 @@ if(btnSaveGroupName) {
         }
     });
 }
-
 const btnCopyLink = document.getElementById('btn-copy-link');
 if(btnCopyLink) {
     btnCopyLink.addEventListener('click', () => {
@@ -627,7 +603,6 @@ if(btnCopyLink) {
         navigator.clipboard.writeText(inviteLink).then(() => alert("Đã copy link mời! Hãy gửi cho bạn bè nhé."));
     });
 }
-
 const btnDeleteGroup = document.getElementById('btn-delete-group');
 if(btnDeleteGroup) {
     btnDeleteGroup.addEventListener('click', () => {
@@ -637,25 +612,22 @@ if(btnDeleteGroup) {
         }
     });
 }
-
 const btnLeaveGroup = document.getElementById('btn-leave-group');
 if(btnLeaveGroup) {
     btnLeaveGroup.addEventListener('click', async () => {
         if(confirm("Bạn có chắc chắn muốn rời nhóm này?")) {
             const myName = currentUser.displayName || currentUser.email;
-            await push(ref(db, `group_messages/${currentRoomId}`), { sender: 'system', text: `${myName} đã rời nhóm.`, timestamp: Date.now() });
+            await push(ref(db, `group_messages/${currentRoomId}`), { sender: 'system', text: `${myName} đã rời nhóm.`, timestamp: Date.now(), type: 'text' });
             await remove(ref(db, `rooms/${currentRoomId}/members/${currentUser.uid}`));
         }
     });
 }
-
 window.kickMember = (uid, memberName) => {
     if(confirm("Kick thành viên này khỏi nhóm?")) {
         remove(ref(db, `rooms/${currentRoomId}/members/${uid}`));
-        push(ref(db, `group_messages/${currentRoomId}`), { sender: 'system', text: `${memberName} đã bị mời ra khỏi nhóm.`, timestamp: Date.now() });
+        push(ref(db, `group_messages/${currentRoomId}`), { sender: 'system', text: `${memberName} đã bị mời ra khỏi nhóm.`, timestamp: Date.now(), type: 'text' });
     }
 };
-
 window.promoteAdmin = (uid) => {
     if(confirm("Cấp quyền Quản trị viên cho người này?")) {
         update(ref(db, `rooms/${currentRoomId}/members/${uid}`), { role: 'admin' });
@@ -663,14 +635,33 @@ window.promoteAdmin = (uid) => {
 };
 
 /* ==========================================
-   XỬ LÝ GỬI TIN NHẮN CHAT
+   XỬ LÝ GỬI, TRẢ LỜI, GEMINI API
 ========================================== */
 const userInput = document.getElementById('user-input');
 const sendBtn = document.getElementById('send-btn');
+
 if(sendBtn && userInput) {
     sendBtn.addEventListener('click', handleSend);
     userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSend(); });
+    
+    // Bắt sự kiện Ctrl + V (Paste ảnh)
+    userInput.addEventListener('paste', (e) => {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (let index in items) {
+            const item = items[index];
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                uploadFileToStorage(file);
+            }
+        }
+    });
 }
+
+// Hàm huỷ Reply
+document.getElementById('cancel-reply')?.addEventListener('click', () => {
+    currentReplyData = null;
+    document.getElementById('reply-preview').classList.add('hidden');
+});
 
 async function handleSend() {
     const text = userInput.value.trim();
@@ -679,14 +670,22 @@ async function handleSend() {
 
     const isGroup = currentMode === 'group';
     const senderName = currentUser ? (currentUser.displayName || currentUser.email) : "Khách";
-    const messageData = { sender: 'user', text: text, name: senderName, avatar: userAvatarStr, timestamp: Date.now() };
+    const messageData = { 
+        sender: 'user', text: text, type: 'text', name: senderName, 
+        avatar: userAvatarStr, timestamp: Date.now() 
+    };
+
+    if (currentReplyData) {
+        messageData.replyTo = currentReplyData;
+        document.getElementById('cancel-reply').click();
+    }
 
     if (isGroup) push(ref(db, `group_messages/${currentRoomId}`), messageData);
     else {
         if(currentUser) push(ref(db, `private_messages/${currentUser.uid}`), messageData);
         else {
-            renderMessage('user', text, 'Khách', null);
-            sessionHistory.push({ role: "user", content: text });
+            renderMessage('guest_temp_id', messageData, 'guest_temp_id');
+            sessionHistory.push({ role: "user", parts: [{ text: text }] });
         }
     }
 
@@ -694,71 +693,131 @@ async function handleSend() {
 
     if (shouldCallAI) {
         const typingId = "typing-" + Date.now();
-        renderMessage('ai', "...", "Trợ lý AI", botAvatarStr, typingId);
+        const typingMsg = { sender: 'ai', text: "...", name: "Trợ lý AI", avatar: botAvatarStr, type: 'text' };
+        renderMessage(typingId, typingMsg, typingId);
 
         try {
             let apiMessages = [];
-if (!isGroup) {
-    // Tạo bản sao của lịch sử hiện tại
-    apiMessages = [...sessionHistory];
-    
-    // Ép tin nhắn hiện tại vào mảng gọi API ngay lập tức, 
-    // không chờ sự kiện onChildAdded của Firebase
-    if (apiMessages.length === 0 || apiMessages[apiMessages.length - 1].content !== text) {
-        apiMessages.push({ role: "user", content: text });
-    }
-} else {
-    apiMessages = [{ role: "user", content: `(Chuyên môn SQL) ${text.replace(/@bot/g, '').trim()}` }];
-}
+            if (!isGroup) {
+                apiMessages = [...sessionHistory];
+                if (apiMessages.length === 0 || apiMessages[apiMessages.length - 1].parts[0].text !== text) {
+                    apiMessages.push({ role: "user", parts: [{ text: text }] });
+                }
+            } else {
+                apiMessages = [{ role: "user", parts: [{ text: `(Chuyên môn SQL) ${text.replace(/@bot/g, '').trim()}` }] }];
+            }
 
-            const response = await fetch(GROQ_API_URL, {
+            const response = await fetch(GEMINI_API_URL, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model: "llama-3.1-8b-instant", messages: apiMessages })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: apiMessages })
             });
-const data = await response.json();
-document.getElementById(typingId)?.remove();
+            const data = await response.json();
+            
+            document.getElementById(typingId)?.remove();
 
-// Nếu API trả về lỗi (VD: 400, 401, 429), in thẳng ra màn hình
-if (!response.ok || data.error) {
-    if(!isGroup) {
-        renderMessage('ai', `⚠️ Lỗi API: ${data.error?.message || response.statusText}`, 'Trợ lý AI');
-    }
-    return;
-}
+            if (!response.ok || data.error) {
+                if(!isGroup) {
+                    const errMsg = { sender: 'ai', text: `⚠️ Lỗi API: ${data.error?.message || response.statusText}`, name: 'Trợ lý AI', type: 'text' };
+                    renderMessage('error_id', errMsg);
+                }
+                return;
+            }
 
-if (data.choices && data.choices.length > 0) {
-                const aiReply = data.choices[0].message.content;
-                const aiMsgData = { sender: 'ai', text: aiReply, name: 'Trợ lý AI', avatar: botAvatarStr, timestamp: Date.now() };
+            if (data.candidates && data.candidates.length > 0) {
+                const aiReply = data.candidates[0].content.parts[0].text;
+                const aiMsgData = { sender: 'ai', text: aiReply, type: 'text', name: 'Trợ lý AI', avatar: botAvatarStr, timestamp: Date.now() };
 
                 if (isGroup) push(ref(db, `group_messages/${currentRoomId}`), aiMsgData);
                 else {
                     if(currentUser) push(ref(db, `private_messages/${currentUser.uid}`), aiMsgData);
                     else {
-                        renderMessage('ai', aiReply, 'Trợ lý AI', botAvatarStr);
-                        sessionHistory.push({ role: "assistant", content: aiReply });
+                        renderMessage('guest_ai_id', aiMsgData, 'guest_ai_id');
+                        sessionHistory.push({ role: "model", parts: [{ text: aiReply }] });
                     }
                 }
             }
         } catch (error) {
             document.getElementById(typingId)?.remove();
-            if(!isGroup) renderMessage('ai', "Lỗi kết nối AI API!", 'Trợ lý AI');
+            if(!isGroup) {
+                const errMsg = { sender: 'ai', text: "Lỗi kết nối AI API! (Có thể do Key sai hoặc lỗi mạng)", name: 'Trợ lý AI', type: 'text' };
+                renderMessage('error_conn', errMsg);
+            }
         }
     }
 }
 
-function renderMessage(sender, text, displayN, customAvatar, idOverride = null) {
-    const chatBox = document.getElementById('chat-box');
-    if(!chatBox) return;
+/* ==========================================
+   CÁC HÀM TƯƠNG TÁC TIN NHẮN (THU HỒI, SỬA, MENU)
+========================================== */
+window.handleDeleteMessage = function(msgId) {
+    if(!confirm("Bạn muốn thu hồi tin nhắn này?")) return;
+    const path = currentMode === 'group' ? `group_messages/${currentRoomId}/${msgId}` : `private_messages/${currentUser.uid}/${msgId}`;
+    update(ref(db, path), { text: "Tin nhắn đã được thu hồi", type: "text" });
+};
 
+window.handleEditMessage = function(msgId, encodedOldText) {
+    document.querySelectorAll('[id^="more-menu-"]').forEach(el => el.classList.add('hidden')); 
+    const oldText = decodeURIComponent(encodedOldText);
+    const newText = prompt("Chỉnh sửa tin nhắn:", oldText);
+    if (newText && newText !== oldText) {
+        const path = currentMode === 'group' ? `group_messages/${currentRoomId}/${msgId}` : `private_messages/${currentUser.uid}/${msgId}`;
+        update(ref(db, path), { text: newText, isEdited: true });
+    }
+};
+
+window.handleReplyBtn = function(msgId, name, encodedText) {
+    currentReplyData = { id: msgId, name: name, text: decodeURIComponent(encodedText) };
+    document.getElementById('reply-name').innerText = "Trả lời: " + name;
+    document.getElementById('reply-text').innerText = currentReplyData.text;
+    document.getElementById('reply-preview').classList.remove('hidden');
+    document.getElementById('user-input').focus();
+};
+
+window.toggleMoreMenu = function(id) {
+    document.querySelectorAll('[id^="react-menu-"]').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('[id^="more-menu-"]').forEach(el => { if(el.id !== 'more-menu-'+id) el.classList.add('hidden')});
+    document.getElementById('more-menu-' + id).classList.toggle('hidden');
+};
+
+window.toggleReactMenu = function(id) {
+    document.querySelectorAll('[id^="more-menu-"]').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('[id^="react-menu-"]').forEach(el => { if(el.id !== 'react-menu-'+id) el.classList.add('hidden')});
+    document.getElementById('react-menu-' + id).classList.toggle('hidden');
+};
+
+window.sendReact = function(msgId, emoji) {
+    if (!currentUser) return alert("Vui lòng đăng nhập để thả cảm xúc!");
+    const path = currentMode === 'group' ? `group_messages/${currentRoomId}/${msgId}/reactions/${currentUser.uid}` : `private_messages/${currentUser.uid}/${msgId}/reactions/${currentUser.uid}`;
+    set(ref(db, path), emoji);
+    document.getElementById('react-menu-' + msgId)?.classList.add('hidden');
+};
+
+// Ẩn menu khi click ra ngoài
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.msg-tools-container')) {
+        document.querySelectorAll('[id^="react-menu-"], [id^="more-menu-"]').forEach(el => el.classList.add('hidden'));
+    }
+});
+
+
+/* ==========================================
+   RENDER TIN NHẮN CHÍNH
+========================================== */
+function renderMessage(msgId, msg, idOverride = null) {
+    const chatBox = document.getElementById('chat-box');
+    if(!chatBox || !msg) return;
+
+    const { sender, text, type = 'text', isEdited = false, name: displayN, avatar: customAvatar, reactions, replyTo } = msg;
+
+    const finalId = idOverride || `msg-${msgId}`;
     const msgDiv = document.createElement('div');
-    if (idOverride) msgDiv.id = idOverride;
+    msgDiv.id = finalId;
     
     if (sender === 'system') {
         msgDiv.className = "flex justify-center w-full my-3";
         msgDiv.innerHTML = `<span class="text-[10px] md:text-xs text-slate-500 bg-slate-200/60 px-4 py-1.5 rounded-full font-medium text-center shadow-sm">${text}</span>`;
-        chatBox.appendChild(msgDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
+        replaceOrAppendMessage(finalId, msgDiv, chatBox);
         return; 
     }
 
@@ -766,37 +825,265 @@ function renderMessage(sender, text, displayN, customAvatar, idOverride = null) 
     const isMe = (sender === 'user' && displayN === myName);
     const isAi = (sender === 'ai');
 
-    msgDiv.className = `flex gap-2 md:gap-4 ${isMe ? 'flex-row-reverse' : ''} mb-4`;
+    msgDiv.className = `flex gap-2 md:gap-3 ${isMe ? 'flex-row-reverse' : ''} mb-5`;
 
     const avatarDiv = document.createElement('div');
-    avatarDiv.className = `w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden ${isMe ? 'bg-slate-800 border-2 border-slate-300' : (isAi ? 'bg-blue-500 border-2 border-blue-200' : 'bg-gray-400')}`;
+    avatarDiv.className = `w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden ${isMe ? 'bg-slate-800 border border-slate-300' : (isAi ? 'bg-blue-500 border border-blue-200' : 'bg-gray-400')}`;
     if (customAvatar) avatarDiv.innerHTML = `<img src="${customAvatar}" class="w-full h-full object-cover">`;
     else avatarDiv.innerText = isMe ? "U" : (isAi ? "AI" : (displayN ? displayN.charAt(0).toUpperCase() : 'X'));
 
     const contentWrapper = document.createElement('div');
-    contentWrapper.className = `flex flex-col max-w-[85%] md:max-w-[80%] ${isMe ? 'items-end' : 'items-start'}`;
+    contentWrapper.className = `flex flex-col max-w-[85%] md:max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`;
 
     const nameLabel = document.createElement('span');
     nameLabel.className = "text-[10px] md:text-xs text-slate-400 mb-1 px-1 font-medium";
     nameLabel.innerText = isMe ? "Bạn" : (isAi ? "🤖 Trợ lý AI" : displayN);
     
     const contentBox = document.createElement('div');
-    contentBox.className = `p-3 md:p-4 rounded-2xl msg-content shadow-sm overflow-x-auto text-sm md:text-base ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'}`;
+    contentBox.className = `p-3 rounded-2xl msg-content shadow-sm overflow-x-auto text-sm md:text-base relative ${isMe ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'}`;
     
-    if (text === "...") {
-        contentBox.innerHTML = `<span class="w-2 h-2 bg-slate-400 rounded-full inline-block animate-bounce"></span>
-                                <span class="w-2 h-2 bg-slate-400 rounded-full inline-block animate-bounce" style="animation-delay: 0.1s"></span>
-                                <span class="w-2 h-2 bg-slate-400 rounded-full inline-block animate-bounce" style="animation-delay: 0.2s"></span>`;
+    let innerContent = '';
+    
+    // UI Trả lời tin nhắn
+    if (replyTo) {
+        innerContent += `
+        <div class="bg-black/10 border-l-4 ${isMe ? 'border-white' : 'border-blue-500'} p-2 mb-2 rounded cursor-pointer hover:opacity-80 transition" onclick="document.getElementById('msg-${replyTo.id}')?.scrollIntoView({behavior: 'smooth'})">
+            <strong class="block text-[10px] md:text-xs uppercase">${replyTo.name}</strong>
+            <span class="truncate block max-w-[200px] text-xs opacity-90">${replyTo.text}</span>
+        </div>`;
+    }
+
+    // UI Nội dung chính
+    if (text === "Tin nhắn đã được thu hồi") {
+        innerContent += `<em class="opacity-70 text-sm">Tin nhắn đã được thu hồi</em>`;
+    } else if (type === 'image') {
+        innerContent += `<img src="${text}" class="max-w-[250px] md:max-w-[350px] w-full rounded-lg cursor-pointer hover:opacity-90 transition-opacity" onclick="window.openImageViewer('${text}')">`;
+    } else if (type === 'audio') {
+        innerContent += `<audio controls class="h-10 w-48 md:w-64"><source src="${text}" type="audio/webm"></audio>`;
+    } else if (text === "...") {
+        innerContent += `<span class="w-2 h-2 bg-slate-400 rounded-full inline-block animate-bounce"></span>
+                        <span class="w-2 h-2 bg-slate-400 rounded-full inline-block animate-bounce" style="animation-delay: 0.1s"></span>
+                        <span class="w-2 h-2 bg-slate-400 rounded-full inline-block animate-bounce" style="animation-delay: 0.2s"></span>`;
     } else {
-        if (typeof marked !== 'undefined') contentBox.innerHTML = marked.parse(text);
-        else contentBox.innerHTML = text.replace(/\n/g, '<br>');
+        if (typeof marked !== 'undefined') innerContent += marked.parse(text);
+        else innerContent += text.replace(/\n/g, '<br>');
+    }
+
+    if (isEdited && text !== "Tin nhắn đã được thu hồi") {
+        innerContent += `<div class="text-[10px] opacity-60 mt-1 ${isMe ? 'text-right' : 'text-left'}">(Đã sửa)</div>`;
+    }
+    
+    contentBox.innerHTML = innerContent;
+
+    // UI Cảm xúc (Reactions)
+    if (reactions && Object.keys(reactions).length > 0) {
+        const reactCounts = {};
+        Object.values(reactions).forEach(r => { reactCounts[r] = (reactCounts[r] || 0) + 1; });
+        const reactIcons = Object.keys(reactCounts).join('');
+        const totalReacts = Object.keys(reactions).length;
+        
+        const reactBadge = document.createElement('div');
+        reactBadge.className = `absolute -bottom-3 ${isMe ? 'left-2' : 'right-2'} bg-white border border-slate-200 rounded-full px-1.5 py-0.5 text-[11px] shadow flex items-center gap-1 z-10 cursor-pointer`;
+        reactBadge.innerHTML = `<span>${reactIcons}</span> ${totalReacts > 1 ? `<span class="text-slate-500 font-bold">${totalReacts}</span>` : ''}`;
+        contentBox.appendChild(reactBadge);
+    }
+
+    const bubbleWrapper = document.createElement('div');
+    bubbleWrapper.className = `flex items-center group w-full ${isMe ? 'flex-row-reverse' : 'flex-row'} gap-2`;
+    bubbleWrapper.appendChild(contentBox);
+
+    // Thanh Công Cụ (Reply, React, 3 Chấm)
+    if (text !== "Tin nhắn đã được thu hồi" && text !== "..." && !idOverride?.includes('temp') && currentUser) {
+        const toolsDiv = document.createElement('div');
+        toolsDiv.className = `hidden group-hover:flex items-center gap-0.5 px-1 text-slate-400 msg-tools-container ${isMe ? 'flex-row-reverse' : 'flex-row'}`;
+        
+        let safeText = '';
+        try { safeText = encodeURIComponent(text); } catch(e) { safeText = encodeURIComponent("File đính kèm"); }
+
+        // Nút Trả Lời
+        toolsDiv.innerHTML += `
+            <button onclick="handleReplyBtn('${msgId}', '${displayN}', '${safeText}')" class="p-1.5 hover:bg-slate-200 hover:text-blue-500 rounded-full transition" title="Trả lời">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+            </button>`;
+        
+        // Nút Cảm Xúc
+        toolsDiv.innerHTML += `
+            <div class="relative flex items-center">
+                <button onclick="toggleReactMenu('${msgId}')" class="p-1.5 hover:bg-slate-200 hover:text-pink-500 rounded-full transition" title="Thả cảm xúc">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </button>
+                <div id="react-menu-${msgId}" class="hidden absolute ${isMe ? 'right-0' : 'left-0'} bottom-full mb-1 bg-white shadow-xl rounded-full px-2 py-1 flex gap-2 border border-slate-200 z-50 text-xl animate-fade-in-up">
+                    <span class="cursor-pointer hover:scale-125 transition transform" onclick="sendReact('${msgId}', '👍')">👍</span>
+                    <span class="cursor-pointer hover:scale-125 transition transform" onclick="sendReact('${msgId}', '❤️')">❤️</span>
+                    <span class="cursor-pointer hover:scale-125 transition transform" onclick="sendReact('${msgId}', '😂')">😂</span>
+                    <span class="cursor-pointer hover:scale-125 transition transform" onclick="sendReact('${msgId}', '😮')">😮</span>
+                    <span class="cursor-pointer hover:scale-125 transition transform" onclick="sendReact('${msgId}', '😢')">😢</span>
+                </div>
+            </div>`;
+
+        // Nút 3 chấm (Chỉ hiện của mình)
+        if (isMe && type === 'text') {
+            toolsDiv.innerHTML += `
+            <div class="relative flex items-center">
+                <button onclick="toggleMoreMenu('${msgId}')" class="p-1.5 hover:bg-slate-200 hover:text-slate-600 rounded-full transition" title="Thêm">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
+                </button>
+                <div id="more-menu-${msgId}" class="hidden absolute right-0 bottom-full mb-1 bg-white shadow-xl rounded-lg flex flex-col border border-slate-200 z-50 text-sm w-24 overflow-hidden">
+                    <button onclick="handleEditMessage('${msgId}', '${safeText}')" class="px-3 py-2 hover:bg-slate-100 text-left font-medium text-slate-700">Sửa</button>
+                    <button onclick="handleDeleteMessage('${msgId}')" class="px-3 py-2 hover:bg-red-50 text-left font-medium text-red-600 border-t border-slate-100">Thu hồi</button>
+                </div>
+            </div>`;
+        }
+
+        bubbleWrapper.appendChild(toolsDiv);
     }
 
     contentWrapper.appendChild(nameLabel);
-    contentWrapper.appendChild(contentBox);
+    contentWrapper.appendChild(bubbleWrapper);
     msgDiv.appendChild(avatarDiv);
     msgDiv.appendChild(contentWrapper);
     
-    chatBox.appendChild(msgDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    replaceOrAppendMessage(finalId, msgDiv, chatBox);
 }
+
+function replaceOrAppendMessage(id, newElement, container) {
+    const existingNode = document.getElementById(id);
+    if (existingNode) {
+        existingNode.replaceWith(newElement);
+    } else {
+        container.appendChild(newElement);
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
+/* ==========================================
+   TÍNH NĂNG UPLOAD ẢNH (DÙNG BASE64 - DATABASE)
+========================================== */
+function uploadFileToStorage(file) {
+    if (!currentUser) {
+        alert("Vui lòng đăng nhập để gửi file/ảnh!");
+        return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+        alert("Vui lòng chọn ảnh/file có dung lượng nhỏ hơn 2MB!");
+        return;
+    }
+
+    const tempId = 'upload-' + Date.now();
+    const tempMsg = { sender: 'user', text: "Đang xử lý ảnh/file...", type: 'text', name: currentUser.displayName, avatar: userAvatarStr };
+    renderMessage(tempId, tempMsg, tempId);
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64Data = e.target.result;
+        const isImage = file.type.startsWith('image/');
+        const type = isImage ? 'image' : 'file';
+
+        const path = currentMode === 'group' ? `group_messages/${currentRoomId}` : `private_messages/${currentUser.uid}`;
+        
+        document.getElementById(tempId)?.remove();
+        
+        push(ref(db, path), {
+            sender: 'user', text: base64Data, type: type,
+            name: currentUser.displayName, avatar: userAvatarStr, timestamp: Date.now()
+        });
+    };
+    reader.readAsDataURL(file);
+}
+
+const fileUpload = document.getElementById('file-upload');
+if (fileUpload) {
+    fileUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) uploadFileToStorage(file);
+    });
+}
+
+/* ==========================================
+   TÍNH NĂNG GHI ÂM (DÙNG BASE64 - DATABASE)
+========================================== */
+let mediaRecorder;
+let audioChunks = [];
+const micBtn = document.getElementById('mic-btn');
+
+if (micBtn) {
+    micBtn.addEventListener('click', async () => {
+        if (!currentUser) return alert("Vui lòng đăng nhập để sử dụng ghi âm!");
+
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    micBtn.classList.remove('animate-pulse', 'bg-red-500', 'text-white'); 
+                    
+                    const tempId = 'audio-' + Date.now();
+                    const tempMsg = { sender: 'user', text: "Đang gửi âm thanh...", type: 'text', name: currentUser.displayName, avatar: userAvatarStr };
+                    renderMessage(tempId, tempMsg, tempId);
+
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const base64Audio = e.target.result;
+                        const path = currentMode === 'group' ? `group_messages/${currentRoomId}` : `private_messages/${currentUser.uid}`;
+                        
+                        document.getElementById(tempId)?.remove();
+                        
+                        push(ref(db, path), {
+                            sender: 'user', text: base64Audio, type: 'audio',
+                            name: currentUser.displayName, avatar: userAvatarStr, timestamp: Date.now()
+                        });
+                    };
+                    reader.readAsDataURL(audioBlob);
+                };
+
+                mediaRecorder.start();
+                micBtn.classList.add('animate-pulse', 'bg-red-500', 'text-white'); 
+            } catch (err) {
+                alert("Không thể truy cập Micro. Hãy kiểm tra quyền truy cập trình duyệt!");
+            }
+        } else {
+            mediaRecorder.stop();
+        }
+    });
+}
+
+/* ==========================================
+   TÍNH NĂNG XEM ẢNH TOÀN MÀN HÌNH (LIGHTBOX)
+========================================== */
+window.openImageViewer = function(src) {
+    const modal = document.getElementById('image-viewer-modal');
+    const img = document.getElementById('image-viewer-img');
+    if(modal && img) {
+        img.src = src;
+        modal.classList.remove('hidden');
+        setTimeout(() => img.classList.replace('scale-95', 'scale-100'), 10);
+    }
+};
+
+window.closeImageViewer = function() {
+    const modal = document.getElementById('image-viewer-modal');
+    const img = document.getElementById('image-viewer-img');
+    if(modal && img) {
+        img.classList.replace('scale-100', 'scale-95');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            img.src = '';
+        }, 200); 
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const closeBtn = document.getElementById('close-image-viewer');
+    const modal = document.getElementById('image-viewer-modal');
+    
+    if(closeBtn) closeBtn.addEventListener('click', closeImageViewer);
+    if(modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeImageViewer(); 
+        });
+    }
+});
