@@ -3,10 +3,11 @@ import { getAuth, onAuthStateChanged, signOut, updateProfile } from "https://www
 import { getDatabase, ref, push, onChildAdded, onChildChanged, onValue, off, get, update, remove, set } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
 // ==========================================
-// CẤU HÌNH API GEMINI & FIREBASE
+// CẤU HÌNH API GROQ & FIREBASE
 // ==========================================
-const GEMINI_API_KEY = 'AQ.Ab8RN6IpqPD7oiXBmN4VMQckflpzOKfKUx6LJLMSk7c1ygUAJg'; // Lưu ý: Nếu báo lỗi API, hãy kiểm tra lại Key (thường bắt đầu bằng AIza...)
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+const GROQ_API_KEY = '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'; // Điền key bắt đầu bằng gsk_...
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'llama-3.3-70b-versatile'; // Bạn có thể đổi sang 'llama3-8b-8192' hoặc 'mixtral-8x7b-32768'
 
 const firebaseConfig = {
     apiKey: "AIzaSyBWvxVVnoOEoK7DlkvH4GMy2TZ5UyItn5A",
@@ -36,10 +37,10 @@ let currentReplyData = null;
 let userAvatarStr = localStorage.getItem('userAvatar') || null;
 let botAvatarStr = localStorage.getItem('botAvatar') || null;
 
-// Khởi tạo lịch sử chat cho Gemini
+// Khởi tạo lịch sử chat cho Groq
 let sessionHistory = [
-    { role: "user", parts: [{ text: "Từ giờ bạn là một chuyên gia AI về SQL. Hãy giúp tôi giải bài tập và sửa lỗi SQL." }] },
-    { role: "model", parts: [{ text: "Chào bạn, tôi là AI chuyên gia SQL. Tôi đã sẵn sàng giúp bạn!" }] }
+    { role: "system", content: "Từ giờ bạn là một chuyên gia AI về SQL. Hãy giúp tôi giải bài tập và sửa lỗi SQL." },
+    { role: "assistant", content: "Chào bạn, tôi là AI chuyên gia SQL. Tôi đã sẵn sàng giúp bạn!" }
 ];
 
 /* ==========================================
@@ -460,10 +461,10 @@ function openPrivateChat() {
     if (currentChatEditListener) off(currentChatEditListener);
     document.getElementById('chat-box').innerHTML = ''; 
     
-    // Khởi tạo lại Lịch sử Gemini khi mở phòng chat riêng
+    // Khởi tạo lại Lịch sử Groq khi mở phòng chat riêng
     sessionHistory = [
-        { role: "user", parts: [{ text: "Từ giờ bạn là một chuyên gia AI về SQL. Hãy giúp tôi giải bài tập và sửa lỗi SQL." }] },
-        { role: "model", parts: [{ text: "Chào bạn, tôi là AI chuyên gia SQL. Tôi đã sẵn sàng giúp bạn!" }] }
+        { role: "system", content: "Từ giờ bạn là một chuyên gia AI về SQL. Hãy giúp tôi giải bài tập và sửa lỗi SQL." },
+        { role: "assistant", content: "Chào bạn, tôi là AI chuyên gia SQL. Tôi đã sẵn sàng giúp bạn!" }
     ];
 
     if (currentUser) {
@@ -477,7 +478,10 @@ function openPrivateChat() {
             
             // NGĂN CHẶN LỖI API: Chỉ nạp tin nhắn chữ (text) vào lịch sử AI
             if (msg.type === 'text' && msg.text !== "Tin nhắn đã được thu hồi") {
-                sessionHistory.push({ role: msg.sender === 'ai' ? "model" : "user", parts: [{ text: msg.text }] });
+                sessionHistory.push({ 
+                    role: msg.sender === 'ai' ? "assistant" : "user", 
+                    content: msg.text 
+                });
             }
         });
         onChildChanged(chatRef, (snapshot) => renderMessage(snapshot.key, snapshot.val()));
@@ -635,7 +639,7 @@ window.promoteAdmin = (uid) => {
 };
 
 /* ==========================================
-   XỬ LÝ GỬI, TRẢ LỜI, GEMINI API
+   XỬ LÝ GỬI, TRẢ LỜI, GROQ API
 ========================================== */
 const userInput = document.getElementById('user-input');
 const sendBtn = document.getElementById('send-btn');
@@ -685,7 +689,7 @@ async function handleSend() {
         if(currentUser) push(ref(db, `private_messages/${currentUser.uid}`), messageData);
         else {
             renderMessage('guest_temp_id', messageData, 'guest_temp_id');
-            sessionHistory.push({ role: "user", parts: [{ text: text }] });
+            sessionHistory.push({ role: "user", content: text });
         }
     }
 
@@ -700,17 +704,28 @@ async function handleSend() {
             let apiMessages = [];
             if (!isGroup) {
                 apiMessages = [...sessionHistory];
-                if (apiMessages.length === 0 || apiMessages[apiMessages.length - 1].parts[0].text !== text) {
-                    apiMessages.push({ role: "user", parts: [{ text: text }] });
+                if (apiMessages.length === 0 || apiMessages[apiMessages.length - 1].content !== text) {
+                    apiMessages.push({ role: "user", content: text });
                 }
             } else {
-                apiMessages = [{ role: "user", parts: [{ text: `(Chuyên môn SQL) ${text.replace(/@bot/g, '').trim()}` }] }];
+                // Nếu chat nhóm, nhồi thêm role system để AI giữ đúng thiết lập chuyên gia
+                apiMessages = [
+                    { role: "system", content: "Bạn là một chuyên gia AI về SQL." },
+                    { role: "user", content: `(Chuyên môn SQL) ${text.replace(/@bot/g, '').trim()}` }
+                ];
             }
 
-            const response = await fetch(GEMINI_API_URL, {
+            const response = await fetch(GROQ_API_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: apiMessages })
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${GROQ_API_KEY}`
+                },
+                body: JSON.stringify({ 
+                    model: GROQ_MODEL,
+                    messages: apiMessages,
+                    temperature: 0.7 
+                })
             });
             const data = await response.json();
             
@@ -724,8 +739,9 @@ async function handleSend() {
                 return;
             }
 
-            if (data.candidates && data.candidates.length > 0) {
-                const aiReply = data.candidates[0].content.parts[0].text;
+            // Bóc tách dữ liệu phản hồi của Groq
+            if (data.choices && data.choices.length > 0) {
+                const aiReply = data.choices[0].message.content;
                 const aiMsgData = { sender: 'ai', text: aiReply, type: 'text', name: 'Trợ lý AI', avatar: botAvatarStr, timestamp: Date.now() };
 
                 if (isGroup) push(ref(db, `group_messages/${currentRoomId}`), aiMsgData);
@@ -733,7 +749,7 @@ async function handleSend() {
                     if(currentUser) push(ref(db, `private_messages/${currentUser.uid}`), aiMsgData);
                     else {
                         renderMessage('guest_ai_id', aiMsgData, 'guest_ai_id');
-                        sessionHistory.push({ role: "model", parts: [{ text: aiReply }] });
+                        sessionHistory.push({ role: "assistant", content: aiReply });
                     }
                 }
             }
