@@ -9,7 +9,7 @@ const part1 = 'AQ.Ab8RN6KpBz7AoX';
 const part2 = 'EpRenyi6U63TKnqdFvEO';
 const part3 = '3_7WGbVb2kUI2SJQ'; // Lấy từ https://aistudio.google.com
 const GEMINI_API_KEY = `${part1}${part2}${part3}`;
-const GEMINI_MODEL = 'gemini-1.5-flash';
+const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 const firebaseConfig = {
