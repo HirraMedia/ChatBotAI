@@ -3,11 +3,11 @@ import { getAuth, onAuthStateChanged, signOut, updateProfile } from "https://www
 import { getDatabase, ref, push, onChildAdded, onChildChanged, onValue, off, get, update, remove, set } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
 // ==========================================
-// CẤU HÌNH API GROQ & FIREBASE
+// CẤU HÌNH API GEMINI & FIREBASE
 // ==========================================
-const GROQ_API_KEY = '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'; // Điền key bắt đầu bằng gsk_...
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.3-70b-versatile'; // Bạn có thể đổi sang 'llama3-8b-8192' hoặc 'mixtral-8x7b-32768'
+const GEMINI_API_KEY = 'AQ.Ab8RN6KEyDv1tR5BN79amemLWA9DsgFX9FpKsbaEC8dTUUEH0Q'; // Lấy từ https://aistudio.google.com
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
 const firebaseConfig = {
     apiKey: "AIzaSyBWvxVVnoOEoK7DlkvH4GMy2TZ5UyItn5A",
@@ -37,14 +37,12 @@ let currentReplyData = null;
 let userAvatarStr = localStorage.getItem('userAvatar') || null;
 let botAvatarStr = localStorage.getItem('botAvatar') || null;
 
-// Khởi tạo lịch sử chat cho Groq
-let sessionHistory = [
-    { role: "system", content: "Từ giờ bạn là một chuyên gia AI về SQL. Hãy giúp tôi giải bài tập và sửa lỗi SQL." },
-    { role: "assistant", content: "Chào bạn, tôi là AI chuyên gia SQL. Tôi đã sẵn sàng giúp bạn!" }
-];
+// Cấu hình lệnh hệ thống và lịch sử lưu trữ cho Gemini
+const systemInstruction = "Từ giờ bạn là một chuyên gia AI về SQL. Hãy giúp tôi giải bài tập, viết câu truy vấn và sửa lỗi SQL.";
+let sessionHistory = [];
 
 /* ==========================================
-   LOGIC GIAO DIỆN MENU MOBILE
+    LOGIC GIAO DIỆN MENU MOBILE
 ========================================== */
 const mainSidebar = document.getElementById('main-sidebar');
 const sidebarOverlay = document.getElementById('sidebar-overlay');
@@ -64,7 +62,7 @@ if (btnCloseSidebar) btnCloseSidebar.addEventListener('click', closeSidebarMobil
 if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebarMobile);
 
 /* ==========================================
-   QUẢN LÝ TÀI KHOẢN & KHỞI ĐỘNG
+    QUẢN LÝ TÀI KHOẢN & KHỞI ĐỘNG
 ========================================== */
 const authBtn = document.getElementById('auth-action-btn');
 const authBtnText = document.getElementById('auth-btn-text');
@@ -111,7 +109,7 @@ if(authBtn) {
 }
 
 /* ==========================================
-   LINK MỜI THAM GIA NHÓM
+    LINK MỜI THAM GIA NHÓM
 ========================================== */
 async function checkInviteLink() {
     if(!document.getElementById('invite-link-modal')) return;
@@ -162,7 +160,7 @@ async function checkInviteLink() {
 }
 
 /* ==========================================
-   CÀI ĐẶT NGƯỜI DÙNG
+    CÀI ĐẶT NGƯỜI DÙNG
 ========================================== */
 let tempSettingsAvatar = userAvatarStr;
 function updateSettingsPreview() {
@@ -228,7 +226,7 @@ if(logoutBtn) {
 }
 
 /* ==========================================
-   TẠO VÀ HIỂN THỊ NHÓM
+    TẠO VÀ HIỂN THỊ NHÓM
 ========================================== */
 let roomType = 'public';
 let roomAvatarBase64 = null;
@@ -354,7 +352,7 @@ function loadRooms() {
 }
 
 /* ==========================================
-   VÀO NHÓM VÀ TÙY CHỌN NHÓM
+    VÀO NHÓM VÀ TÙY CHỌN NHÓM
 ========================================== */
 const btnPrivateChat = document.getElementById('btn-private-chat');
 if (btnPrivateChat) btnPrivateChat.addEventListener('click', openPrivateChat);
@@ -461,11 +459,8 @@ function openPrivateChat() {
     if (currentChatEditListener) off(currentChatEditListener);
     document.getElementById('chat-box').innerHTML = ''; 
     
-    // Khởi tạo lại Lịch sử Groq khi mở phòng chat riêng
-    sessionHistory = [
-        { role: "system", content: "Từ giờ bạn là một chuyên gia AI về SQL. Hãy giúp tôi giải bài tập và sửa lỗi SQL." },
-        { role: "assistant", content: "Chào bạn, tôi là AI chuyên gia SQL. Tôi đã sẵn sàng giúp bạn!" }
-    ];
+    // Khởi tạo lịch sử rỗng theo chuẩn Gemini
+    sessionHistory = [];
 
     if (currentUser) {
         const chatRef = ref(db, `private_messages/${currentUser.uid}`);
@@ -476,11 +471,11 @@ function openPrivateChat() {
             const msg = snapshot.val();
             renderMessage(snapshot.key, msg);
             
-            // NGĂN CHẶN LỖI API: Chỉ nạp tin nhắn chữ (text) vào lịch sử AI
+            // Đồng bộ lịch sử tin nhắn dạng 'user' và 'model' phù hợp cấu trúc Gemini
             if (msg.type === 'text' && msg.text !== "Tin nhắn đã được thu hồi") {
                 sessionHistory.push({ 
-                    role: msg.sender === 'ai' ? "assistant" : "user", 
-                    content: msg.text 
+                    role: msg.sender === 'ai' ? "model" : "user", 
+                    parts: [{ text: msg.text }] 
                 });
             }
         });
@@ -493,7 +488,7 @@ function openPrivateChat() {
 }
 
 /* ==========================================
-   DRAWER TÙY CHỌN NHÓM & QUẢN LÝ THÀNH VIÊN
+    DRAWER TÙY CHỌN NHÓM & QUẢN LÝ THÀNH VIÊN
 ========================================== */
 const drawer = document.getElementById('group-drawer');
 const btnGroupOpts = document.getElementById('btn-group-options');
@@ -639,7 +634,7 @@ window.promoteAdmin = (uid) => {
 };
 
 /* ==========================================
-   XỬ LÝ GỬI, TRẢ LỜI, GROQ API
+    XỬ LÝ GỬI, TRẢ LỜI, GEMINI API
 ========================================== */
 const userInput = document.getElementById('user-input');
 const sendBtn = document.getElementById('send-btn');
@@ -689,7 +684,8 @@ async function handleSend() {
         if(currentUser) push(ref(db, `private_messages/${currentUser.uid}`), messageData);
         else {
             renderMessage('guest_temp_id', messageData, 'guest_temp_id');
-            sessionHistory.push({ role: "user", content: text });
+            // Đồng bộ lịch sử theo mảng object của Gemini
+            sessionHistory.push({ role: "user", parts: [{ text: text }] });
         }
     }
 
@@ -704,27 +700,26 @@ async function handleSend() {
             let apiMessages = [];
             if (!isGroup) {
                 apiMessages = [...sessionHistory];
-                if (apiMessages.length === 0 || apiMessages[apiMessages.length - 1].content !== text) {
-                    apiMessages.push({ role: "user", content: text });
+                if (apiMessages.length === 0 || apiMessages[apiMessages.length - 1].parts[0].text !== text) {
+                    apiMessages.push({ role: "user", parts: [{ text: text }] });
                 }
             } else {
-                // Nếu chat nhóm, nhồi thêm role system để AI giữ đúng thiết lập chuyên gia
+                // Định dạng nội dung truy vấn trong phòng chat nhóm
                 apiMessages = [
-                    { role: "system", content: "Bạn là một chuyên gia AI về SQL." },
-                    { role: "user", content: `(Chuyên môn SQL) ${text.replace(/@bot/g, '').trim()}` }
+                    { role: "user", parts: [{ text: `(Yêu cầu: Giải đáp SQL) ${text.replace(/@bot/g, '').trim()}` }] }
                 ];
             }
 
-            const response = await fetch(GROQ_API_URL, {
+            // GỌI GEMINI API TRỰC TIẾP QUA FETCH TRÌNH DUYỆT
+            const response = await fetch(GEMINI_API_URL, {
                 method: 'POST',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${GROQ_API_KEY}`
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ 
-                    model: GROQ_MODEL,
-                    messages: apiMessages,
-                    temperature: 0.7 
+                    systemInstruction: { parts: [{ text: systemInstruction }] },
+                    contents: apiMessages,
+                    generationConfig: { temperature: 0.7 } 
                 })
             });
             const data = await response.json();
@@ -739,9 +734,9 @@ async function handleSend() {
                 return;
             }
 
-            // Bóc tách dữ liệu phản hồi của Groq
-            if (data.choices && data.choices.length > 0) {
-                const aiReply = data.choices[0].message.content;
+            // Bóc tách dữ liệu phản hồi của cấu trúc JSON Gemini
+            if (data.candidates && data.candidates.length > 0) {
+                const aiReply = data.candidates[0].content.parts[0].text;
                 const aiMsgData = { sender: 'ai', text: aiReply, type: 'text', name: 'Trợ lý AI', avatar: botAvatarStr, timestamp: Date.now() };
 
                 if (isGroup) push(ref(db, `group_messages/${currentRoomId}`), aiMsgData);
@@ -749,7 +744,7 @@ async function handleSend() {
                     if(currentUser) push(ref(db, `private_messages/${currentUser.uid}`), aiMsgData);
                     else {
                         renderMessage('guest_ai_id', aiMsgData, 'guest_ai_id');
-                        sessionHistory.push({ role: "assistant", content: aiReply });
+                        sessionHistory.push({ role: "model", parts: [{ text: aiReply }] });
                     }
                 }
             }
@@ -764,7 +759,7 @@ async function handleSend() {
 }
 
 /* ==========================================
-   CÁC HÀM TƯƠNG TÁC TIN NHẮN (THU HỒI, SỬA, MENU)
+    CÁC HÀM TƯƠNG TÁC TIN NHẮN (THU HỒI, SỬA, MENU)
 ========================================== */
 window.handleDeleteMessage = function(msgId) {
     if(!confirm("Bạn muốn thu hồi tin nhắn này?")) return;
@@ -816,9 +811,8 @@ document.addEventListener('click', (e) => {
     }
 });
 
-
 /* ==========================================
-   RENDER TIN NHẮN CHÍNH
+    RENDER TIN NHẮN CHÍNH
 ========================================== */
 function renderMessage(msgId, msg, idOverride = null) {
     const chatBox = document.getElementById('chat-box');
@@ -908,7 +902,7 @@ function renderMessage(msgId, msg, idOverride = null) {
     bubbleWrapper.className = `flex items-center group w-full ${isMe ? 'flex-row-reverse' : 'flex-row'} gap-2`;
     bubbleWrapper.appendChild(contentBox);
 
-    // Thanh Công Cụ (Reply, React, 3 Chấm)
+    // Thanh Công Cụ (Reply, React, Thêm)
     if (text !== "Tin nhắn đã được thu hồi" && text !== "..." && !idOverride?.includes('temp') && currentUser) {
         const toolsDiv = document.createElement('div');
         toolsDiv.className = `hidden group-hover:flex items-center gap-0.5 px-1 text-slate-400 msg-tools-container ${isMe ? 'flex-row-reverse' : 'flex-row'}`;
@@ -937,7 +931,7 @@ function renderMessage(msgId, msg, idOverride = null) {
                 </div>
             </div>`;
 
-        // Nút 3 chấm (Chỉ hiện của mình)
+        // Nút 3 chấm quản lý của chính mình
         if (isMe && type === 'text') {
             toolsDiv.innerHTML += `
             <div class="relative flex items-center">
@@ -973,7 +967,7 @@ function replaceOrAppendMessage(id, newElement, container) {
 }
 
 /* ==========================================
-   TÍNH NĂNG UPLOAD ẢNH (DÙNG BASE64 - DATABASE)
+    TÍNH NĂNG UPLOAD ẢNH (DÙNG BASE64 - DATABASE)
 ========================================== */
 function uploadFileToStorage(file) {
     if (!currentUser) {
@@ -1016,7 +1010,7 @@ if (fileUpload) {
 }
 
 /* ==========================================
-   TÍNH NĂNG GHI ÂM (DÙNG BASE64 - DATABASE)
+    TÍNH NĂNG GHI ÂM (DÙNG BASE64 - DATABASE)
 ========================================== */
 let mediaRecorder;
 let audioChunks = [];
@@ -1068,7 +1062,7 @@ if (micBtn) {
 }
 
 /* ==========================================
-   TÍNH NĂNG XEM ẢNH TOÀN MÀN HÌNH (LIGHTBOX)
+    TÍNH NĂNG XEM ẢNH TOÀN MÀN HÌNH (LIGHTBOX)
 ========================================== */
 window.openImageViewer = function(src) {
     const modal = document.getElementById('image-viewer-modal');
